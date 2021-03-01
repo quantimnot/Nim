@@ -172,8 +172,7 @@
 ## -------------------
 ## --match:PAT         select files containing a (not displayed) match of PAT
 ## --noMatch:PAT       select files not containing any match of PAT
-## --bin:on|off|only   process binary files? (detected by \0 in first 1K bytes)
-##                     (default: off - binary and text files treated the same way)
+## --bin:on|only       process binary files? (detected by \0 in first 1K bytes)
 ##
 ## Represent results
 ## -----------------
@@ -197,9 +196,11 @@
 ##
 ## Miscellaneous
 ## -------------
-## --threads:N, -j:N   speed up search by `N` additional workers (default: autodetect)
+## --threads:N, -j:N   speed up search by `N` additional workers
+##                     (default: autodetect)
 ## --verbose           be verbose: list every processed file
-## --quiet             disables replacement confirmation; only output what's requested
+## --quiet             disables replacement confirmation; only output what is
+##                     requested
 ## --help, -h          shows this help
 ## --version, -v       shows the version
 ##
@@ -240,7 +241,7 @@
 ## * `1`  No match.
 ## * `2`  A fatal error occurred during search-only, search/replace of `stdin`,
 ##        or before any other replacement.
-## * `3`  An fatal error occurred after one or more replacements.
+## * `3`  An fatal error occurred after one or more replacements.git
 ##
 ##
 ## Security
@@ -480,6 +481,8 @@ type
     terminal: int  # column in terminal emulator
     file: int      # column in file (for correct Tab processing)
     overflowMatches: int
+  ColorScheme {.pure.} = enum
+    simple, bnw, ack, gnu
 
 var
   paths: seq[string]
@@ -487,10 +490,10 @@ var
   options: Options = {optRegex}
   walkOpt {.threadvar.}: WalkOpt
   searchOpt {.threadvar.}: SearchOpt
-  sortTime = false
+  sortTime = false # TODO: use options enum
   sortTimeOrder = SortOrder.Ascending
-  oneline = true  # turned off by --group
-  expandTabs = true  # Tabs are expanded in oneline mode
+  oneline = true  # turned off by --group # TODO: use options enum
+  expandTabs = true  # Tabs are expanded in oneline mode # TODO: use options enum
   linesBefore = 0
   linesAfter = 0
   linesContext = 0
@@ -500,17 +503,21 @@ var
   nWorkers = countProcessors()
   searchRequestsChan: Channel[Request]
   resultsChan: Channel[Result]
-  colorTheme: string = "simple"
-  limitCharUsr = high(int)  # don't limit line width by default
-  termWidth = 80
+  colorTheme: string = "simple" # TODO: use enum
+  limitCharUsr = high(int)  # don't limit line width by default # TODO: need?
+  termWidth = 80 # TODO: This can be determined at runtime. terminal.terminalWidth
 
 
 proc ask(msg: string): string =
+  ## Used to prompt user while in interactive mode.
+  ## Only used when `stdin` and `stdout` are connected to a terminal.
   stdout.write(msg)
   stdout.flushFile()
   result = stdin.readLine()
 
 proc confirm: ConfirmEnum =
+  ## Used to prompt user to confirm replacement while in interactive mode.
+  ## Only used when `stdin` and `stdout` are connected to a terminal.
   while true:
     case normalize(ask("     [a]bort; [y]es, a[l]l, [n]o, non[e]: "))
     of "a", "abort": return ceAbort
