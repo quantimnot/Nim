@@ -23,6 +23,11 @@ when not defined(leanCompiler):
 import strutils except `%` # collides with ropes.`%`
 
 from ic / ic import ModuleBackendFlag
+when compileOption("debugger"): include debuggeelocal
+
+from modulegraphs import ModuleGraph, PPassContext
+from lineinfos import
+  warnGcMem, errXMustBeCompileTime, hintDependency, errGenerated, errCannotOpenFile
 import dynlib
 
 when not declared(dynlib.libCandidates):

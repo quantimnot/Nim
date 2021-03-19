@@ -16,6 +16,8 @@ import
 
 from ic / ic import addCompilerProc
 
+when compileOption("debugger"): include debuggeelocal
+
 const
   FirstCallConv* = wNimcall
   LastCallConv* = wNoconv

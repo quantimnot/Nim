@@ -128,6 +128,54 @@ You can import them directly for debugging:
   from renderer import renderTree
   from msgs import `??`
 
+To create a new compiler for each run, use `koch temp`::
+
+  ./koch temp c /tmp/test.nim
+
+`koch temp` creates a debug build of the compiler, which is useful
+to create stacktraces for compiler debugging. See also
+`Rebuilding the compiler`_ if you need more control.
+
+GDB/LLDB Conditional breakpoints
+--------------------------------
+
+Given some sample of code you'd like to investigate:
+
+.. code-block:: nim
+  # sample.nim
+  let x = 1 + 1
+  {.push checks: off.}
+  let y = int64.high + 1   # <- interested in this line...
+  {.pop.}
+
+Do this:
+
+* `koch temp`.
+* Set a breakpoint in `ccgexprs.binaryArithOverflow` with a condition of
+  `debuggee == "sample" and debuggeeLine == 4`.
+* Hit run and enjoy not wading through unnecessary breaks.
+
+The `debugee` and `debuggeeLine` variables are global variables
+injected into relevant compiler modules whenever the `--debugger:native`
+compile option is given. `./koch temp` does so by default.
+
+Conditional breakpoints in hot call graphs can greatly increase the time until your
+debuggee is compiled. Here is a trick:
+Have a triggered breakpoint further up the call graph enable or set breakpoints
+deeper in the call graph.
+
+For example, let's say you'd like to debug signature matching:
+
+.. code-block:: nim
+  # sample.nim
+  TODO
+
+Setting a conditional breakpoint in `sigmatch.matches` will waste your time
+evaluating the condition until your debug sample case gets there. It has to do
+sig matching for all of `system` and friends.
+
+Do this: TODO
+
 
 The compiler's architecture
 ===========================

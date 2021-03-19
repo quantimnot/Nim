@@ -14,6 +14,8 @@ import
   idents, lexer, passes, syntaxes, llstream, modulegraphs,
   lineinfos, pathutils, tables
 
+when compileOption("debugger"): include debuggeelocal
+
 import ic / replayer
 
 proc resetSystemArtifacts*(g: ModuleGraph) =
@@ -102,6 +104,8 @@ proc compileModule*(graph: ModuleGraph; fileIdx: FileIndex; flags: TSymFlags, fr
     let filename = AbsoluteFile toFullPath(graph.config, fileIdx)
     if result == nil:
       result = newModule(graph, fileIdx)
+      setDebuggee(result.name.s)
+      setDebuggeeLineInfo(0, 0)
       result.flags.incl flags
       registerModule(graph, result)
       processModuleAux("import")
@@ -114,6 +118,8 @@ proc compileModule*(graph: ModuleGraph; fileIdx: FileIndex; flags: TSymFlags, fr
       replayStateChanges(graph.packed[m.int].module, graph)
       replayGenericCacheInformation(graph, m.int)
   elif graph.isDirty(result):
+    setDebuggee(result.name.s)
+    setDebuggeeLineInfo(0, 0)
     result.flags.excl sfDirty
     # reset module fields:
     initStrTables(graph, result)

@@ -2777,6 +2777,7 @@ proc semExpr(c: PContext, n: PNode, flags: TExprFlags = {}): PNode =
       if isCompilerDebug():
         echo ("<", c.config$n.info, n, ?.result.typ)
 
+  setDebuggeeLineInfo(n.info.line, n.info.col)
   result = n
   if c.config.cmd == cmdIdeTools: suggestExpr(c, n)
   if nfSem in n.flags: return

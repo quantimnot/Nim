@@ -12,6 +12,8 @@
 when not defined(nimcore):
   {.error: "nimcore MUST be defined for Nim's core tooling".}
 
+when compileOption("debugger"): from debugger import nil
+
 import
   std/[strutils, os, times, tables, sha1, with, json],
   llstream, ast, lexer, syntaxes, options, msgs,

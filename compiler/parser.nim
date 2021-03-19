@@ -36,6 +36,8 @@ import
 when defined(nimpretty):
   import layouter
 
+when compileOption("debugger"): include debuggeelocal
+
 type
   Parser* = object            # A Parser object represents a file that
                               # is being parsed

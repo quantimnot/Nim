@@ -25,6 +25,8 @@ when defined(nimfix):
 when not defined(leanCompiler):
   import spawn
 
+when compileOption("debugger"): include debuggeelocal
+
 # implementation
 
 proc semExpr(c: PContext, n: PNode, flags: TExprFlags = {}): PNode

@@ -16,6 +16,8 @@ import
   syntaxes, modulegraphs, reorder,
   lineinfos, pathutils
 
+when compileOption("debugger"): include debuggeelocal
+
 type
   TPassData* = tuple[input: PNode, closeOutput: PNode]
 
@@ -150,6 +152,7 @@ proc processModule*(graph: ModuleGraph; module: PSym; idgen: IdGenerator;
     while true:
       if graph.stopCompile(): break
       var n = parseTopLevelStmt(p)
+      setDebuggeeLineInfo(n.info.line, n.info.col)
       if n.kind == nkEmpty: break
       if (sfSystemModule notin module.flags and
           ({sfNoForward, sfReorder} * module.flags != {} or
