@@ -291,16 +291,20 @@ const SupportIoctlInheritCtl = (defined(linux) or defined(bsd)) and
                               not defined(nimscript)
 when SupportIoctlInheritCtl:
   var
+    FIONBIO {.importc, header: "<sys/ioctl.h>".}: cint
     FIOCLEX {.importc, header: "<sys/ioctl.h>".}: cint
     FIONCLEX {.importc, header: "<sys/ioctl.h>".}: cint
 
   proc c_ioctl(fd: cint, request: cint): cint {.
     importc: "ioctl", header: "<sys/ioctl.h>", varargs.}
-elif defined(posix) and not defined(lwip) and not defined(nimscript):
+elif defined(posix) and not (defined(nimscript) or defined(freertos)):
   var
     F_GETFD {.importc, header: "<fcntl.h>".}: cint
     F_SETFD {.importc, header: "<fcntl.h>".}: cint
+    F_GETFL {.importc, header: "<fcntl.h>".}: cint
+    F_SETFL {.importc, header: "<fcntl.h>".}: cint
     FD_CLOEXEC {.importc, header: "<fcntl.h>".}: cint
+    O_NONBLOCK {.importc, header: "<fcntl.h>".}: cint
 
   proc c_fcntl(fd: cint, cmd: cint): cint {.
     importc: "fcntl", header: "<fcntl.h>", varargs.}
@@ -391,6 +395,57 @@ when defined(nimdoc) or (defined(posix) and not defined(nimscript)) or defined(w
     else:
       result = setHandleInformation(f, HANDLE_FLAG_INHERIT,
                                     inheritable.WinDWORD) != 0
+
+when defined(nimdoc) or not (defined(nimscript) or defined(windows) or defined(freertos)):
+  proc setNonBlocking*(f: FileHandle, nonBlocking = true) {.raises: [OSError].} =
+    ## Control file handle blocking mode.
+    ##
+    ## Non-blocking IO `read`/`write` calls return immediately with whatever
+    ## result is available, without putting the current thread to sleep. The
+    ## call is expected to be tried again.
+    ##
+    ## Calling `read` on a non-blocking file handle will result in an `IOError`
+    ## of `EAGAIN <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/errno.h.html>`_
+    ## whenever there is no data to read. The state can be checked beforehand
+    ## with either `endOfFile <#endOfFile,File>`_ or `atEnd <streams.html#atEnd,Stream>`_.
+    ##
+    ## This requires the OS file handle, which can be
+    ## retrieved via `getOsFileHandle <#getOsFileHandle,File>`_.
+    ##
+    ## This procedure is available for POSIX platforms. Test for
+    ## availability with `declared() <system.html#declared,untyped>`_.
+    ##
+    ## There are separate APIs on Windows for using console handles,
+    ## pipes and sockets in a non-blocking manner. Some of which aren't
+    ## implemented in stdlib yet.
+    ##
+    ## See `setNonBlocking(File, bool) <#setNonBlocking,File>`_.
+    runnableExamples:
+      when not defined(windows):
+        setNonBlocking(getOsFileHandle(stdin))
+        doAssert(endOfFile(stdin))
+    when SupportIoctlInheritCtl:
+      let opt = if nonBlocking: 1 else: 0
+      if c_ioctl(f, FIONBIO, unsafeAddr(opt)) == -1:
+        raise newException(OSError, "failed to set file handle mode")
+    elif defined(posix):
+      var x: int = c_fcntl(f, F_GETFL, 0)
+      if x == -1:
+        raise newException(OSError, "failed to get file handle mode")
+      else:
+        var mode = if nonBlocking: x or O_NONBLOCK else: x and not O_NONBLOCK
+        if c_fcntl(f, F_SETFL, mode) == -1:
+          raise newException(OSError, "failed to set file handle mode")
+
+  proc setNonBlocking*(f: File, nonBlocking = true) {.raises: [OSError].} =
+    ## Control file blocking mode.
+    ##
+    ## See `setNonBlocking(FileHandle, bool) <#setNonBlocking,FileHandle>`_.
+    runnableExamples:
+      when not defined(windows):
+        setNonBlocking(stdin)
+        doAssert(endOfFile(stdin))
+    setNonBlocking(getOsFileHandle(f), nonBlocking)
 
 proc readLine*(f: File, line: var string): bool {.tags: [ReadIOEffect],
               benign.} =
