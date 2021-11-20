@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.inc": "cpp"
+    },
+    "restructuredtext.confPath": "",
+    "restructuredtext.linter.disabled": true
+}

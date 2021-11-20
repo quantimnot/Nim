@@ -25,7 +25,7 @@ when defined(nimfix):
 when not defined(leanCompiler):
   import spawn
 
-when compileOption("debugger"): include debuggeelocal
+include debuggeelocal
 
 # implementation
 

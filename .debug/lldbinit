@@ -1,0 +1,2 @@
+command script import --allow-reload .debug/formatters/lldbnim.py
+# add custom debug directives here

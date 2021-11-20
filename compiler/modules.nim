@@ -14,7 +14,7 @@ import
   idents, lexer, passes, syntaxes, llstream, modulegraphs,
   lineinfos, pathutils, tables
 
-when compileOption("debugger"): include debuggeelocal
+include debuggeelocal
 
 import ic / replayer
 

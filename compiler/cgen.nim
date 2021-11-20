@@ -23,7 +23,7 @@ when not defined(leanCompiler):
 import strutils except `%` # collides with ropes.`%`
 
 from ic / ic import ModuleBackendFlag
-when compileOption("debugger"): include debuggeelocal
+import debuggee
 
 from modulegraphs import ModuleGraph, PPassContext
 from lineinfos import

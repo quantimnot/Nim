@@ -16,7 +16,7 @@ import
   syntaxes, modulegraphs, reorder,
   lineinfos, pathutils
 
-when compileOption("debugger"): include debuggeelocal
+include debuggeelocal
 
 type
   TPassData* = tuple[input: PNode, closeOutput: PNode]
