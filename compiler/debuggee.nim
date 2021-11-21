@@ -19,18 +19,14 @@ when compileOption("debugger"):
   var debugger_isCompilingDebuggeeTarget* {.exportc.}: bool
     # used by the debugger for conditional expressions
 
-  proc onSigTrap(a: cint) {.exportc, noconv.} = discard
-    # A dummy SIGTRAP handler.
-    # It is called when a SIGTRAP is raised.
-    # SIGTRAP is raised when code of interest is being compiled.
-    # The debugger sets a breakpoint on this and then runs commands like
-    # enabling all other breakpoints.
-    # SEE ALSO
-    #   * `compiler.lldb`
-    #   * `setDebuggeeLineInfo`
-
-  # install the SIGTRAP handler
-  signal(SIGTRAP, onSigTrap)
+  proc nowCompilingDebuggeeTarget {.exportc.} = discard
+    ## A dummy proc that the debuger can brek on when the source of interest
+    ## is being compiled.
+    ## The debugger sets a breakpoint on this and then runs commands like
+    ## enabling all other breakpoints.
+    ## SEE ALSO
+    ##   * `compiler.lldb`
+    ##   * `setDebuggeeLineInfo`
 
 template setDebuggeeTarget*(s: string) =
   when compileOption("debugger"):
@@ -46,6 +42,6 @@ template setDebuggeeLineInfo*(line, column: SomeInteger | int16) = # TODO: why i
     debuggeeColumn = column.int
     if debuggee == debuggeeTarget and debuggeeLine == debuggeeTargetLine:
       debugger_isCompilingDebuggeeTarget = true
-      discard `raise`(SIGTRAP)
+      nowCompilingDebuggeeTarget()
     else:
       debugger_isCompilingDebuggeeTarget = false

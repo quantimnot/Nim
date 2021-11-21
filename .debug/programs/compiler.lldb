@@ -1,9 +1,8 @@
-# break when the SIGTRAP handler in `debuggee.nim` is executed
-# SIGTRAP is raised when the module name and line of interest are being compiled
-breakpoint set -n 'onSigTrap' -c debugger_isCompilingDebuggeeTarget == true -N sigtrap
-breakpoint command add sigtrap
+# break when `nowCompilingDebuggeeTarget` in `debuggee.nim` is called
+breakpoint set -n 'nowCompilingDebuggeeTarget' -N nowCompilingDebuggeeTarget
+breakpoint command add nowCompilingDebuggeeTarget
 	# prevent this breakpoint from triggering again
-	breakpoint delete sigtrap
+	breakpoint delete nowCompilingDebuggeeTarget
 	# line of interest is being compiled now, so enable all breakpoints
 	breakpoint enable
 	# let's debug
@@ -14,18 +13,14 @@ DONE
 # and commands to run once it's hit
 breakpoint set -r main.* -N main_entry
 breakpoint command add main_entry
-	# set SIGTRAP handling
-	# just pass the signal to the process so `debuggee.onSigTrap` can catch it
-	process handle -p true -s false -n false SIGTRAP
-
 	# disable all current breakpoints until the module name and line of interest are being compiled
 	breakpoint disable
-	# enable the SIGTRAP breakpoint though
-	breakpoint enable sigtrap
+	# enable the nowCompilingDebuggeeTarget breakpoint though
+	breakpoint enable nowCompilingDebuggeeTarget
 
 	# delete the main_entry breakpoint
 	# continue execution; there's nothing we're interested in here
-	# just needed a starting point to set signal handling
+	# just needed a starting point to setup the debugging session
 	breakpoint delete main_entry
 	continue
 DONE
