@@ -27,7 +27,7 @@ on:
 
 jobs:
   csources:
-    uses: .github/workflows/csources.yml@HEAD
+    uses: ./.github/workflows/csources.yml
 
   # bootstrap:
   #   runs-on: ${{ matrix.buildHost }}
