@@ -26,36 +26,39 @@ on:
       - pr_github_ci
 
 jobs:
-  bootstrap:
-    runs-on: ${{ matrix.buildHost }}
-    # needs: noskipci
-    strategy:
-      fail-fast: false
-      matrix:
-        buildHost:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-        defines:
-          - 'debug'
-          - 'release'
-          - 'danger'
-        mm: [refc, orc]
-    steps:
-      - uses: actions/checkout@v3
+  csources:
+    uses: .github/workflows/csources.yml
 
-      - id: cache-csources
-        uses: actions/cache@v3
-        with:
-          path: |
-            csources
-            bin/nim_csources*
-          key: csources-${{ hashFiles('config/build_config.txt') }}
+  # bootstrap:
+  #   runs-on: ${{ matrix.buildHost }}
+  #   # needs: noskipci
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       buildHost:
+  #         - ubuntu-latest
+  #         - macos-latest
+  #         - windows-latest
+  #       defines:
+  #         - 'debug'
+  #         - 'release'
+  #         - 'danger'
+  #       mm: [refc, orc]
+  #   steps:
+  #     - uses: actions/checkout@v3
 
-      - id: build_all_sh
-        if: ${{ matrix.buildHost != 'windows-latest' }}
-        run: ./build_all.sh
+  #     - id: cache-csources
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: |
+  #           csources
+  #           bin/nim_csources*
+  #         key: csources-${{ hashFiles('config/build_config.txt') }}
 
-      - id: build_all_bat
-        if: ${{ matrix.buildHost == 'windows-latest' }}
-        run: build_all.bat
+  #     - id: build_all.sh
+  #       if: ${{ matrix.buildHost != 'windows-latest' }}
+  #       run: sh build_all.sh
+
+  #     - id: build_all.bat
+  #       if: ${{ matrix.buildHost == 'windows-latest' }}
+  #       run: cmd build_all.bat
