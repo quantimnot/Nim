@@ -1,0 +1,59 @@
+name: bootstrap
+
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+
+# https://docs.github.com/en/actions/reference
+# https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-github-actions
+# https://docs.github.com/en/actions/guides/storing-workflow-data-as-artifacts
+# https://github.github.io/actions-cheat-sheet/actions-cheat-sheet.pdf
+# https://github.com/actions/checkout
+# https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#using-the-cache-action
+#
+# TODO:
+#   - better caching: https://stackoverflow.com/questions/59269850/caching-apt-packages-in-github-actions-workflow
+#   - Create a test result branch: `REPO/test-results`.
+#   - Commit test outputs to the test result branch.
+# https://stackoverflow.com/questions/57921401/push-to-origin-from-github-action/58393457#58393457
+
+
+concurrency:
+  group: bootstrap
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - pr_github_ci
+
+jobs:
+  bootstrap:
+    runs-on: ${{ matrix.buildHost }}
+    # needs: noskipci
+    strategy:
+      fail-fast: false
+      matrix:
+        buildHost:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        defines:
+          - 'debug'
+          - 'release'
+          - 'danger'
+        mm: [refc, orc]
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: cache-csources
+        uses: actions/cache@v3
+        with:
+          path: ['csources', 'bin/nim_csources*']
+          key: csources-${{ hashFiles('config/build_config.txt') }}
+
+      - id: build_all.sh
+        if: ${{ matrix.buildHost != 'windows-latest' }}
+        run: ./build_all.sh
+
+      - id: build_all.bat
+        if: ${{ matrix.buildHost == 'windows-latest' }}
+        run: build_all.bat
