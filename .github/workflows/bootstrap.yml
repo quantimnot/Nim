@@ -52,10 +52,10 @@ jobs:
             bin/nim_csources*
           key: csources-${{ hashFiles('config/build_config.txt') }}
 
-      - id: build_all.sh
+      - id: build_all_sh
         if: ${{ matrix.buildHost != 'windows-latest' }}
         run: ./build_all.sh
 
-      - id: build_all.bat
+      - id: build_all_bat
         if: ${{ matrix.buildHost == 'windows-latest' }}
         run: build_all.bat
