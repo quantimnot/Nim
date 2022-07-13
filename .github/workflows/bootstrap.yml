@@ -47,7 +47,9 @@ jobs:
       - id: cache-csources
         uses: actions/cache@v3
         with:
-          path: ['csources', 'bin/nim_csources*']
+          path: |
+            csources
+            bin/nim_csources*
           key: csources-${{ hashFiles('config/build_config.txt') }}
 
       - id: build_all.sh
