@@ -22,7 +22,7 @@ jobs:
           - buildHost: ubuntu-latest
             os: linux
             arch: i386
-            buildCmd: sh build_all.sh ucpu=i386
+            buildCmd: docker run 'i386/ubuntu' 'sh build_all.sh'
 
           - buildHost: macos-latest
             os: macos
