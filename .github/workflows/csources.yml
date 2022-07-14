@@ -22,7 +22,7 @@ jobs:
           - buildHost: ubuntu-latest
             os: linux
             arch: i386
-            buildCmd: docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t 'i386/ubuntu' 'sh build_all.sh'
+            buildCmd: docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t 'i386/ubuntu' sh build_all.sh
 
           - buildHost: macos-latest
             os: macos
