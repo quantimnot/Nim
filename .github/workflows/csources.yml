@@ -42,9 +42,9 @@ jobs:
           key: csources-${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ hashFiles('config/build_config.txt') }}
 
       - id: build_all_sh
-        if: matrix.platform.runOnBuildHost == 'true' && steps.cache.outputs.cache-hit != 'true' && matrix.platform.os != 'windows'
+        if: matrix.platform.os != 'windows' && steps.cache.outputs.cache-hit != 'true' && matrix.platform.runOnBuildHost == 'true'
         run: sh build_all.sh
 
       - id: build_all_bat
-        if: matrix.platform.runOnBuildHost == 'true' && steps.cache.outputs.cache-hit != 'true' && matrix.platform.os == 'windows'
+        if: matrix.platform.os == 'windows' && steps.cache.outputs.cache-hit != 'true'
         run: .\build_all.bat
