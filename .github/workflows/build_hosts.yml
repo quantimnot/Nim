@@ -24,4 +24,4 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           docker build -t nim:linux_i386 - < .github/workflows/linux_i386.Dockerfile
-          docker export nim:linux_i386 > docker_linux_i386.tar
+          docker export linux_i386 > docker_linux_i386.tar
