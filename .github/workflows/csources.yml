@@ -29,7 +29,7 @@ jobs:
           - buildHost: windows-latest
             os: windows
             arch: amd64
-            runOnBuildHost: 'true'
+            runOnBuildHost: true
     steps:
       - uses: actions/checkout@v3
 
@@ -42,9 +42,9 @@ jobs:
           key: csources-${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ hashFiles('config/build_config.txt') }}
 
       - id: build_all_sh
-        if: matrix.platform.os != 'windows' && steps.cache.outputs.cache-hit != 'true' && matrix.platform.runOnBuildHost == 'true'
+        if: matrix.platform.os != 'windows' && steps.cache.outputs.cache-hit != 'true' && matrix.platform.runOnBuildHost
         run: sh build_all.sh
 
       - id: build_all_bat
-        if: (matrix.platform.os == 'windows') && (steps.cache.outputs.cache-hit != 'true') && (matrix.platform.runOnBuildHost == 'true')
+        if: (matrix.platform.os == 'windows') && (steps.cache.outputs.cache-hit != 'true') && (matrix.platform.runOnBuildHost)
         run: .\build_all.bat
