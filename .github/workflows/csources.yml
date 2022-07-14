@@ -29,7 +29,7 @@ jobs:
           key: csources-${{ hashFiles('config/build_config.txt') }}
 
       - id: build_all_sh
-        if: (steps.cache-csources.outputs.cache-hit == 'false') && matrix.buildHost != 'windows-latest'
+        if: steps.cache-csources.outputs.cache-hit != 'true'
         run: sh build_all.sh
 
       - id: build_all_bat
