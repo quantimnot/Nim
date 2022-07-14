@@ -9,7 +9,7 @@ concurrency:
 on: workflow_call
 
 jobs:
-  cache-csources:
+  cache-csources-amd64:
     runs-on: ${{ matrix.buildHost }}
     strategy:
       matrix:
@@ -17,6 +17,17 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
+        os:
+          - linux
+          - macos
+          - windows
+        exclude:
+          buildHost: ubuntu-latest
+          os: [macos, windows]
+          buildHost: macos-latest
+          os: [linux, windows]
+          buildHost: windows-latest
+          os: [linux, macos]
     steps:
       - uses: actions/checkout@v3
 
@@ -26,7 +37,7 @@ jobs:
           path: |
             csources
             bin/nim_csources*
-          key: csources-${{ matrix.buildHost }}-${{ hashFiles('config/build_config.txt') }}
+          key: csources-${{ matrix.os }}-amd64-${{ hashFiles('config/build_config.txt') }}
 
       - id: build_all_sh
         if: steps.cache-csources.outputs.cache-hit != 'true' && matrix.buildHost != 'windows-latest'
@@ -35,3 +46,21 @@ jobs:
       - id: build_all_bat
         if: steps.cache-csources.outputs.cache-hit != 'true' && matrix.buildHost == 'windows-latest'
         run: .\build_all.bat
+
+  cache-csources-linux-i386:
+    runs-on: ubuntu-latest
+    container: i386/ubuntu
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: cache-csources
+        uses: actions/cache@v3
+        with:
+          path: |
+            csources
+            bin/nim_csources*
+          key: csources-linux-i386-${{ hashFiles('config/build_config.txt') }}
+
+      - id: build_all_sh
+        if: steps.cache-csources.outputs.cache-hit != 'true'
+        run: sh build_all.sh
