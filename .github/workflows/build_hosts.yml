@@ -1,0 +1,27 @@
+name: build_hosts
+
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+
+concurrency:
+  group: build_hosts
+
+on: workflow_call
+
+jobs:
+  docker_linux_i386:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ../docker_linux_i386.tar
+          key: docker_linux_i386-${{ hashFiles('.github/workflows/linux_i386.Dockerfile') }}
+
+      - id: build
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          docker build -t nim:linux_i386 - < .github/workflows/linux_i386.Dockerfile
+          docker export nim:linux_i386 > docker_linux_i386.tar
