@@ -34,4 +34,4 @@ jobs:
 
       - id: build_all_bat
         if: steps.cache-csources.outputs.cache-hit != 'true' && matrix.buildHost == 'windows-latest'
-        run: cmd build_all.bat
+        run: .\build_all.bat
