@@ -22,18 +22,12 @@ jobs:
           - macos
           - windows
         exclude:
-          buildHost: ubuntu-latest
-          os: macos
-          buildHost: ubuntu-latest
-          os: windows
-          buildHost: macos-latest
-          os: linux
-          buildHost: macos-latest
-          os: windows
-          buildHost: windows-latest
-          os: linux
-          buildHost: windows-latest
-          os: macos
+          - buildHost: ubuntu-latest
+            os: [macos, windows]
+          - buildHost: macos-latest
+            os: [linux, windows]
+          - buildHost: windows-latest
+            os: [linux, macos]
     steps:
       - uses: actions/checkout@v3
 
