@@ -17,7 +17,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            ../docker_linux_i386.tar
+            docker_linux_i386.tar
           key: docker_linux_i386-${{ hashFiles('.github/workflows/linux_i386.Dockerfile') }}
 
       - id: build
