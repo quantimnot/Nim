@@ -36,6 +36,7 @@ jobs:
             arch: amd64
             buildCmd: .\build_all.bat
     steps:
+      - uses: ./.github/workflows/build_hosts.yml
       - uses: actions/checkout@v3
 
       - id: cache
