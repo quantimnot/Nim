@@ -29,7 +29,7 @@ jobs:
           - buildHost: windows-latest
             os: windows
             arch: amd64
-            runOnBuildHost: true
+            runOnBuildHost: 'true'
     steps:
       - uses: actions/checkout@v3
 
