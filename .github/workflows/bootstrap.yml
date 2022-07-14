@@ -26,8 +26,8 @@ on:
       - pr_github_ci
 
 jobs:
-  build_hosts:
-    uses: ./.github/workflows/build_hosts.yml
+  # build_hosts:
+  #   uses: ./.github/workflows/build_hosts.yml
   csources:
     needs: build_hosts
     uses: ./.github/workflows/csources.yml
