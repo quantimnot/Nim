@@ -25,6 +25,7 @@ jobs:
             buildCmd: |
               docker image build -o type=tar,dest=linux_i386.tar - < .github/workflows/linux_i386.Dockerfile
               docker image load -i linux_i386.tar
+              ls -l
               docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t linux_i386 sh build_all.sh
 
           - buildHost: macos-latest
