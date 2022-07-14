@@ -17,19 +17,22 @@ jobs:
           - buildHost: ubuntu-latest
             os: linux
             arch: amd64
-            runOnBuildHost: true
+            buildCmd: sh build_all.sh
+
           - buildHost: ubuntu-latest
             os: linux
             arch: i386
-            runOnBuildHost: false
+            buildCmd: sh build_all.sh ucpu=i386
+
           - buildHost: macos-latest
             os: macos
             arch: amd64
-            runOnBuildHost: true
+            buildCmd: sh build_all.sh
+
           - buildHost: windows-latest
             os: windows
             arch: amd64
-            runOnBuildHost: true
+            buildCmd: .\build_all.bat
     steps:
       - uses: actions/checkout@v3
 
@@ -41,10 +44,6 @@ jobs:
             bin/nim_csources*
           key: csources-${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ hashFiles('config/build_config.txt') }}
 
-      - id: build_all_sh
-        if: matrix.platform.os != 'windows' && steps.cache.outputs.cache-hit != 'true' && matrix.platform.runOnBuildHost
-        run: sh build_all.sh
-
-      - id: build_all_bat
-        if: (matrix.platform.os == 'windows') && (steps.cache.outputs.cache-hit != 'true') && (matrix.platform.runOnBuildHost)
-        run: .\build_all.bat
+      - id: build_all
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: ${{ matrix.platform.buildCmd }}
