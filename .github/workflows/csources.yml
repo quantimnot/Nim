@@ -9,71 +9,42 @@ concurrency:
 on: workflow_call
 
 jobs:
-  cache-csources-linux-amd64:
-    runs-on: ubuntu-latest
+  cache:
+    runs-on: ${{ matrix.platform.buildHost }}
+    strategy:
+      matrix:
+        platform:
+          - buildHost: ubuntu-latest
+            os: linux
+            arch: amd64
+            runOnBuildHost: true
+          - buildHost: ubuntu-latest
+            os: linux
+            arch: i386
+            runOnBuildHost: false
+          - buildHost: macos-latest
+            os: macos
+            arch: amd64
+            runOnBuildHost: true
+          - buildHost: windows-latest
+            os: windows
+            arch: amd64
+            runOnBuildHost: true
     steps:
       - uses: actions/checkout@v3
 
-      - id: cache-csources
+      - id: cache
         uses: actions/cache@v3
         with:
           path: |
             csources
             bin/nim_csources*
-          key: csources-linux-amd64-${{ hashFiles('config/build_config.txt') }}
+          key: csources-${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ hashFiles('config/build_config.txt') }}
 
       - id: build_all_sh
-        if: steps.cache-csources.outputs.cache-hit != 'true'
+        if: matrix.platform.runOnBuildHost == 'true' && steps.cache.outputs.cache-hit != 'true' && matrix.platform.os != 'windows'
         run: sh build_all.sh
-
-  cache-csources-linux-i386:
-    runs-on: ubuntu-latest
-    container: i386/ubuntu
-    steps:
-      - uses: actions/checkout@v3
-
-      - id: cache-csources
-        uses: actions/cache@v3
-        with:
-          path: |
-            csources
-            bin/nim_csources*
-          key: csources-linux-i386-${{ hashFiles('config/build_config.txt') }}
-
-      - id: build_all_sh
-        if: steps.cache-csources.outputs.cache-hit != 'true'
-        run: sh build_all.sh
-
-  cache-csources-macos-amd64:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - id: cache-csources
-        uses: actions/cache@v3
-        with:
-          path: |
-            csources
-            bin/nim_csources*
-          key: csources-macos-amd64-${{ hashFiles('config/build_config.txt') }}
-
-      - id: build_all_sh
-        if: steps.cache-csources.outputs.cache-hit != 'true'
-        run: sh build_all.sh
-
-  cache-csources-windows-amd64:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - id: cache-csources
-        uses: actions/cache@v3
-        with:
-          path: |
-            csources
-            bin\nim_csources*
-          key: csources-windows-amd64-${{ hashFiles('config\build_config.txt') }}
 
       - id: build_all_bat
-        if: steps.cache-csources.outputs.cache-hit != 'true'
+        if: matrix.platform.runOnBuildHost == 'true' && steps.cache.outputs.cache-hit != 'true' && matrix.platform.os == 'windows'
         run: .\build_all.bat
