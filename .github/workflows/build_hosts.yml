@@ -26,20 +26,20 @@ jobs:
           docker build -t nim:linux_i386 - < .github/workflows/linux_i386.Dockerfile
           docker save nim:linux_i386 > docker_linux_i386.tar
 
-  # docker_linux_packer:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v3
+  docker_linux_packer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - id: cache
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: |
-  #           ../docker_linux_packer.tar
-  #         key: docker_linux_packer-${{ hashFiles('.github/workflows/linux_packer.Dockerfile') }}
+      - id: cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            docker_linux_packer.tar
+          key: docker_linux_packer-${{ hashFiles('.github/workflows/linux_packer.Dockerfile') }}
 
-  #     - id: build
-  #       if: steps.cache.outputs.cache-hit != 'true'
-  #       run: |
-  #         docker build -t nim:linux_packer - < .github/workflows/linux_packer.Dockerfile
-  #         docker save nim:linux_packer > docker_linux_packer.tar
+      - id: build
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          docker build -t nim:linux_packer - < .github/workflows/linux_packer.Dockerfile
+          docker save nim:linux_packer > docker_linux_packer.tar
