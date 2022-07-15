@@ -26,11 +26,13 @@ on:
       - pr_github_ci
 
 jobs:
-  build_hosts:
-    uses: ./.github/workflows/build_hosts.yml
+  # build_hosts:
+  #   uses: ./.github/workflows/build_hosts.yml
   csources:
-    needs: build_hosts
+    # needs: build_hosts
     uses: ./.github/workflows/csources.yml
+    with:
+      nocache: contains(github.event.head_commit.message, '[ci nocache]')
 
   # bootstrap:
   #   runs-on: ${{ matrix.buildHost }}
