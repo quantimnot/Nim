@@ -23,7 +23,7 @@ jobs:
             os: linux
             arch: i386
             buildCmd: |
-              docker load -t nim:linux_i386 docker_linux_i386.tar
+              docker load -i docker_linux_i386.tar
               docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t nim:linux_i386 sh build_all.sh ucpu=i386
 
           - buildHost: macos-latest
