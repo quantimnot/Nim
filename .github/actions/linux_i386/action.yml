@@ -25,5 +25,7 @@ runs:
 
     - run: |
         docker load -i docker_linux_i386.tar
-        docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t nim:linux_i386 ${{ inputs.run }}
+        docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t nim:linux_i386
+        ${{ inputs.run }}
+        exit
       shell: bash

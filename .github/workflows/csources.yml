@@ -39,7 +39,6 @@ jobs:
             arch: amd64
             buildHost: macos-latest
             buildCmd: |
-              brew install gmake
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
           - os: windows
