@@ -79,6 +79,7 @@ jobs:
         run: ${{ matrix.platform.buildCmd }}
 
       - id: build_all_windows
+        name: Build Nim (Windows)
         if: matrix.platform.os == 'windows' && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         run: ${{ matrix.platform.buildCmd }}
         shell: cmd
