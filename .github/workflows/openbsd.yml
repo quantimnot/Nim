@@ -1,0 +1,39 @@
+
+builders:
+  - &builder-definition
+    type: virtualbox-iso
+    name: vbox-gce-builder
+
+    iso_urls:
+      - cd69.iso
+      - https://cdn.openbsd.org/pub/OpenBSD/6.9/amd64/cd69.iso
+    iso_checksum: sha256:b391350d72a4fcab550033c830a17612cff65ebdb6de428732d9b15f780bf9c2
+
+    vm_name: openbsd69-gce.x86-64
+    disk_size: 4096
+    memory: 512
+    cpus: 1
+    guest_os_type: OpenBSD_64
+    headless: true
+    guest_additions_mode: disable
+    virtualbox_version_file: '' # Do not upload version file
+
+    http_directory: config
+
+    boot_wait: 20s
+    boot_command:
+      - S<enter><wait>
+      - dhclient em0<enter><wait><wait><wait>
+      - ftp -o install.conf http://{{ .HTTPIP }}:{{ .HTTPPort }}/openbsd-install.conf<enter><wait>
+      - sed -i 's|<<ROOT_PUBKEY>>|{{ .SSHPublicKey }}|' /install.conf<enter><wait>
+      - install -a -f /install.conf && reboot<enter>
+    ssh_wait_timeout: 10000s  # Installation may take some time, let's make sure we won't timeout.
+    ssh_username: root
+    pause_before_connecting: 10s  # Let's give rc.firsttime a chance to finish.
+    shutdown_command: halt -p
+
+  - <<: *builder-definition
+    name: vbox-vagrant-builder
+    vm_name: openbsd69.x86-64
+    # As suggested in https://www.vagrantup.com/docs/boxes/base.html#disk-space
+    disk_size: 65536

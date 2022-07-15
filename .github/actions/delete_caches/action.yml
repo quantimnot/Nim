@@ -1,8 +1,5 @@
 name: delete_caches
 description: Delete *all* GitHub caches for this repo.
-on:
-  workflow_dispatch: {}
-  workflow_run: {}
 jobs:
   delete_caches:
     runs-on: ubuntu-latest
