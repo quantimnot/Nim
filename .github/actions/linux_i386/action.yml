@@ -1,6 +1,9 @@
 name: 'Linux i386'
 description: 'Run in a Linux i386 container.'
 inputs:
+  nocache:
+    default: false
+    type: boolean
   run:
     required: true
 runs:
@@ -13,7 +16,7 @@ runs:
           docker_linux_i386.tar
         key: docker_linux_i386-${{ hashFiles('.github/workflows/linux_i386.Dockerfile') }}
 
-    - if: steps.cache.outputs.cache-hit != 'true' || contains(github.event.head_commit.message, '[ci nocache]')
+    - if: steps.cache.outputs.cache-hit != 'true' || inputs.nocache
       run: |
         docker build -t nim:linux_i386 - < .github/workflows/linux_i386.Dockerfile
         docker save nim:linux_i386 > docker_linux_i386.tar
