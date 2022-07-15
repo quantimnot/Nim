@@ -43,7 +43,7 @@ jobs:
             arch: amd64
             runOnVm: true
             buildCmd: |
-              sudo pkg_add -l git
+              sudo pkg_add git
               sh build_all.sh
 
           - buildHost: macos-latest
