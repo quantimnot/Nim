@@ -61,6 +61,7 @@ jobs:
           - buildHost: windows-latest
             os: windows
             arch: amd64
+            shell: cmd
             buildCmd: .\build_all.bat
 
     steps:
@@ -77,6 +78,7 @@ jobs:
       - id: build_all
         if: (!matrix.platform.runOnDocker && !matrix.platform.runOnVm) && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         run: ${{ matrix.platform.buildCmd }}
+        shell: ${{ matrix.platform.shell || 'bash' }}
 
       - id: build_all_with_docker
         if: matrix.platform.runOnDocker && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
