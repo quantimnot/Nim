@@ -23,7 +23,6 @@ jobs:
           - buildHost: ubuntu-latest
             os: linux
             arch: amd64
-            shell: bash
             buildCmd: sh build_all.sh
 
           - buildHost: ubuntu-latest
@@ -31,13 +30,11 @@ jobs:
             arch: i386
             runOnDocker: true
             dockerImage: docker_linux_i386.tar
-            shell: bash
             buildCmd: sh build_all.sh ucpu=i386
 
           - buildHost: macos-latest
             os: macos
             arch: amd64
-            shell: bash
             buildCmd: sh build_all.sh
 
           - buildHost: macos-latest
@@ -45,7 +42,6 @@ jobs:
             osVer: '7.1'
             arch: amd64
             runOnVm: true
-            shell: bash
             buildCmd: sh build_all.sh
 
           - buildHost: macos-latest
@@ -53,7 +49,6 @@ jobs:
             osVer: '12.2'
             arch: amd64
             runOnVm: true
-            shell: bash
             buildCmd: sh build_all.sh
 
           - buildHost: ubuntu-latest
@@ -61,13 +56,11 @@ jobs:
             osVer: '9.2'
             arch: amd64
             runOnVm: true
-            shell: bash
             buildCmd: sh build_all.sh
 
           - buildHost: windows-latest
             os: windows
             arch: amd64
-            shell: cmd
             buildCmd: .\build_all.bat
 
     steps:
@@ -82,9 +75,16 @@ jobs:
           key: csources-${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ hashFiles('config/build_config.txt') }}
 
       - id: build_all
-        if: (!matrix.platform.runOnDocker && !matrix.platform.runOnVm) && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
+        if: matrix.platform.os != 'windows' && (!matrix.platform.runOnDocker && !matrix.platform.runOnVm) && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         run: ${{ matrix.platform.buildCmd }}
         shell: ${{ matrix.platform.shell }}
+
+      - id: build_all_windows
+        if: matrix.platform.os == 'windows' && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
+        run: ${{ matrix.platform.buildCmd }}
+        shell: cmd
+        # XXX: This special case for Windows is because I can't get this to work:
+        # shell: ${{ matrix.platform.shell }}
 
       - id: build_all_with_docker
         if: matrix.platform.runOnDocker && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
