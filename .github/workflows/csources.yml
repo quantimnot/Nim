@@ -69,11 +69,11 @@ jobs:
           key: csources-${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ hashFiles('config/build_config.txt') }}
 
       - id: build_all
-        if: matrix.platform.runOnVm != true && (steps.cache-csources.outputs.cache-hit != 'true' || "! contains(github.event.head_commit.message, '[ci nocache]')")
+        if: matrix.platform.runOnVm != true && (steps.cache-csources.outputs.cache-hit != 'true' || !contains(github.event.head_commit.message, '[ci nocache]'))
         run: ${{ matrix.platform.buildCmd }}
 
       - id: build_all_with_vm
-        if: matrix.platform.runOnVm == true && (steps.cache-csources.outputs.cache-hit != 'true' || "! contains(github.event.head_commit.message, '[ci nocache]')")
+        if: matrix.platform.runOnVm == true && (steps.cache-csources.outputs.cache-hit != 'true' || !contains(github.event.head_commit.message, '[ci nocache]'))
         uses: cross-platform-actions/action@v0.6.2
         with:
           operating_system: ${{ matrix.platform.os }}
