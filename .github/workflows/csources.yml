@@ -43,7 +43,7 @@ jobs:
             arch: amd64
             runOnVm: true
             buildCmd: |
-              sudo pkg_add git
+              sudo pkg_add git make
               sh build_all.sh
 
           - buildHost: macos-latest
@@ -52,7 +52,7 @@ jobs:
             arch: amd64
             runOnVm: true
             buildCmd: |
-              sudo pkg install -y git
+              sudo pkg install -y git make
               sh build_all.sh
 
           - buildHost: ubuntu-latest
@@ -61,7 +61,7 @@ jobs:
             arch: amd64
             runOnVm: true
             buildCmd: |
-              sudo pkg_add git
+              sudo pkg_add git make
               sh build_all.sh
 
           - buildHost: windows-latest
