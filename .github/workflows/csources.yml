@@ -86,6 +86,7 @@ jobs:
         # shell: ${{ matrix.platform.shell }}
 
       - id: build_all_with_docker
+        name: Build Nim (${{ matrix.platform.os }})
         if: matrix.platform.runOnDocker && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         uses: ./.github/actions/linux_i386
         with:
