@@ -75,8 +75,8 @@ jobs:
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
     steps:
-      - uses: ./.github/actions/delete_caches
       - uses: actions/checkout@v3
+      - uses: ./.github/actions/delete_caches
 
       - id: cache-csources
         if: "!inputs.nocache"
