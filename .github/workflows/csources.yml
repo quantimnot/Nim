@@ -77,7 +77,6 @@ jobs:
       - id: build_all
         if: matrix.platform.os != 'windows' && (!matrix.platform.runOnDocker && !matrix.platform.runOnVm) && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         run: ${{ matrix.platform.buildCmd }}
-        shell: ${{ matrix.platform.shell }}
 
       - id: build_all_windows
         if: matrix.platform.os == 'windows' && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
