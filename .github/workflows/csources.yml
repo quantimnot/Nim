@@ -80,7 +80,7 @@ jobs:
 
       - id: build_all_with_docker
         if: matrix.platform.runOnDocker && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
-        uses: ./.github/actions/linux_i386.yml
+        uses: quantimnot/nim-lang/.github/actions/linux_i386.yml
         with:
           run: ${{ matrix.platform.buildCmd }}
 
