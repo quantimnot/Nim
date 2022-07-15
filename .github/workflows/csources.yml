@@ -81,7 +81,8 @@ jobs:
       - id: build_all_with_docker
         if: matrix.platform.runOnDocker && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         uses: ./.github/actions/linux_i386.yml
-        run: ${{ matrix.platform.buildCmd }}
+        with:
+          run: ${{ matrix.platform.buildCmd }}
 
       - id: build_all_with_vm
         if: matrix.platform.runOnVm && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
