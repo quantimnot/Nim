@@ -32,7 +32,7 @@ jobs:
     # needs: build_hosts
     uses: ./.github/workflows/csources.yml
     with:
-      nocache: contains(github.event.head_commit.message, '[ci nocache]')
+      nocache: ${{ contains(github.event.head_commit.message, '[ci nocache]') }}
 
   # bootstrap:
   #   runs-on: ${{ matrix.buildHost }}
