@@ -4,6 +4,7 @@ runs:
   using: "composite"
   steps:
     - run: |
+        set -e
         hub api repos/$GITHUB_REPOSITORY/actions/caches | jq '.actions_caches[].id' > cache_ids.lst
         while read id
         do hub api -X DELETE repos/$GITHUB_REPOSITORY/actions/caches/$id

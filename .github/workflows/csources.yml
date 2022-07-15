@@ -21,7 +21,8 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - os: linux
+          - id: linux-amd64
+            os: linux
             arch: amd64
             buildHost: ubuntu-latest
             buildCmd: |
@@ -77,6 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/delete_caches
+        if: matrix.platform.id == 'linux-amd64'
 
       - id: cache-csources
         if: "!inputs.nocache"
