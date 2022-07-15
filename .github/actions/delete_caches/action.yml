@@ -8,3 +8,4 @@ runs:
         while read id
         do hub api -X DELETE repos/$GITHUB_REPOSITORY/actions/caches/$id
         done < cache_ids.lst
+      shell: bash
