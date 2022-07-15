@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          hub api repos/${{ github.repository }}/actions/caches | jq '.actions_caches[].id'` > cache_ids.lst
+          hub api repos/$GITHUB_REPOSITORY/actions/caches | jq '.actions_caches[].id'` > cache_ids.lst
           while read id
-          do hub api -X DELETE repos/${{ github.repository }}/actions/caches/$id
+          do hub api -X DELETE repos/$GITHUB_REPOSITORY/actions/caches/$id
           done < cache_ids.lst
