@@ -10,13 +10,14 @@ runs:
   using: "composite"
   steps:
     - id: cache
+      if: !inputs.nocache
       uses: actions/cache@v3
       with:
         path: |
           docker_linux_i386.tar
         key: docker_linux_i386-${{ hashFiles('.github/workflows/linux_i386.Dockerfile') }}
 
-    - if: steps.cache.outputs.cache-hit != 'true' || inputs.nocache
+    - if: inputs.nocache || steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         docker build -t nim:linux_i386 - < .github/workflows/linux_i386.Dockerfile
