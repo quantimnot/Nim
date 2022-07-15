@@ -21,7 +21,7 @@ jobs:
           key: docker_linux_i386-${{ hashFiles('.github/workflows/linux_i386.Dockerfile') }}
 
       - id: build
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true' || contains(github.event.head_commit.message, '[ci nocache]')
         run: |
           docker build -t nim:linux_i386 - < .github/workflows/linux_i386.Dockerfile
           docker save nim:linux_i386 > docker_linux_i386.tar
