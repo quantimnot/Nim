@@ -1,11 +1,10 @@
 name: delete_caches
 description: Delete *all* GitHub caches for this repo.
-jobs:
-  delete_caches:
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          hub api repos/$GITHUB_REPOSITORY/actions/caches | jq '.actions_caches[].id'` > cache_ids.lst
-          while read id
-          do hub api -X DELETE repos/$GITHUB_REPOSITORY/actions/caches/$id
-          done < cache_ids.lst
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        hub api repos/$GITHUB_REPOSITORY/actions/caches | jq '.actions_caches[].id'` > cache_ids.lst
+        while read id
+        do hub api -X DELETE repos/$GITHUB_REPOSITORY/actions/caches/$id
+        done < cache_ids.lst
