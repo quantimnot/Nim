@@ -1,0 +1,12 @@
+name: delete_caches
+description: Delete *all* GitHub caches for this repo.
+on: workflow_dispatch: {} # workflow_dispatch allows this workflow to be manually invoked in the Actions UI
+jobs:
+  delete_caches:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          hub api repos/${{ github.repository }}/actions/caches | jq '.actions_caches[].id'` > cache_ids.lst
+          while read id
+          do hub api -X DELETE repos/${{ github.repository }}/actions/caches/$id
+          done < cache_ids.lst
