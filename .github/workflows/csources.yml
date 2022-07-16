@@ -1,3 +1,12 @@
+# Caches can be deleted by cache `id` using the GitHub API.
+#
+# ```sh
+# hub api repos/$GITHUB_REPOSITORY/actions/caches | jq '.actions_caches[].id' > cache_ids.lst
+# while read id
+# do hub api -X DELETE repos/$GITHUB_REPOSITORY/actions/caches/$id
+# done < cache_ids.lst
+# ```
+
 name: csources
 
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
@@ -28,7 +37,8 @@ jobs:
             buildCmd: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
-          - os: linux
+          - id: linux-i386
+            os: linux
             arch: i386
             buildHost: ubuntu-latest
             runOnDocker: true
@@ -36,19 +46,22 @@ jobs:
             buildCmd: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded ucpu=i386
 
-          - os: macos
+          - id: macos-amd64
+            os: macos
             arch: amd64
             buildHost: macos-latest
             buildCmd: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
-          - os: windows
+          - id: windows-amd64
+            os: windows
             arch: amd64
             buildHost: windows-latest
             buildCmd: |
               .\ci\build_autogen.bat
 
-          - os: openbsd
+          - id: openbsd-amd64
+            os: openbsd
             osVer: '7.1'
             arch: amd64
             buildHost: macos-latest
@@ -57,7 +70,8 @@ jobs:
               sudo pkg_add git gmake
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
-          - os: freebsd
+          - id: freebsd-amd64
+            os: freebsd
             osVer: '12.2'
             arch: amd64
             buildHost: macos-latest
@@ -66,7 +80,8 @@ jobs:
               sudo pkg install -y git gmake
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
-          - os: netbsd
+          - id: netbsd-amd64
+            os: netbsd
             osVer: '9.2'
             arch: amd64
             buildHost: ubuntu-latest
@@ -100,7 +115,7 @@ jobs:
         if: matrix.platform.os == 'windows' && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         run: ${{ matrix.platform.buildCmd }}
         shell: cmd
-        # XXX: This special case for Windows is because I can't get this to work:
+        # XXX: Special case for Windows because this won't work:
         # shell: ${{ matrix.platform.shell }}
 
       - id: build_all_with_docker
