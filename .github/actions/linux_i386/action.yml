@@ -33,7 +33,7 @@ runs:
 
     - run: |
         docker load -i docker_linux_i386.tar
-        docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t nim:linux_i386 /bin/bash -s <<EOF
-        ${{ inputs.run }}
+        cat <<"EOF" | docker run --rm -i --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t nim:linux_i386
+        uname
         EOF
       shell: bash
