@@ -48,7 +48,9 @@ jobs:
         with:
           path: .github
       - id: set-matrix
-        run: echo "::set-output name=matrix::`yaml2json .github/platforms.yml`"
+        run: |
+          go get -u github.com/wakeful/yaml2json
+          echo "::set-output name=matrix::`yaml2json .github/platforms.yml`"
 
   cache:
     needs: matrix
