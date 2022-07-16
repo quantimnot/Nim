@@ -16,6 +16,19 @@ name: bootstrap
 # https://stackoverflow.com/questions/57921401/push-to-origin-from-github-action/58393457#58393457
 
 
+# CI Directives
+# * [ci skip]: do not run ci
+# * [ci nocache]: run ci without caches
+# * [ci failfast]: any failure cancels all other jobs
+
+
+# Possible workflows:
+# 1. csource caches
+# 1. bootstrap linux-amd64
+# 1. bootstrap macos-amd64 and windows-amd64
+#
+
+
 concurrency:
   group: bootstrap
   cancel-in-progress: true
@@ -26,11 +39,10 @@ on:
       - pr_github_ci
 
 jobs:
-  cache:
-    runs-on: ${{ matrix.platform.buildHost }}
+  matrix:
+    runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
-      matrix: &matrix
+      matrix:
         platform:
           - id: linux-amd64
             os: linux
@@ -97,6 +109,21 @@ jobs:
             run: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    steps:
+      - id: set-matrix
+        run: echo "::set-output name=matrix::${{ toJSON(matrix) }}"
+
+
+  cache:
+    needs: matrix
+    runs-on: ${{ matrix.platform.buildHost }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+
     steps:
       - uses: actions/checkout@v3
 
@@ -144,13 +171,13 @@ jobs:
             ${{ matrix.platform.provision }}
             ${{ matrix.platform.run }}
 
+
   bootstrap:
-    needs: cache
+    needs: [matrix, cache]
     runs-on: ${{ matrix.platform.buildHost }}
     strategy:
       fail-fast: false
-      matrix:
-        <<: *matrix
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v3
