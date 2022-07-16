@@ -48,7 +48,7 @@ jobs:
       - id: set-matrix
         run: |
           yq -o=json '.' .github/platforms.yml > .github/platforms.json
-          echo "::set-output name=matrix::${{ toJSON(.github/platforms.json) }}"
+          echo "::set-output name=matrix::${{ toJSON('.github/platforms.json') }}"
 
   cache:
     needs: matrix
