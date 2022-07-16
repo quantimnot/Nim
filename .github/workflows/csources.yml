@@ -34,7 +34,7 @@ jobs:
             os: linux
             arch: amd64
             buildHost: ubuntu-latest
-            buildCmd: |
+            run: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
           - id: linux-i386
@@ -45,21 +45,21 @@ jobs:
             containerImageTar: docker_linux_i386.tar
             provision: |
               apt-get install -yq git
-            buildCmd: |
+            run: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded ucpu=i386
 
           - id: macos-amd64
             os: macos
             arch: amd64
             buildHost: macos-latest
-            buildCmd: |
+            run: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
           - id: windows-amd64
             os: windows
             arch: amd64
             buildHost: windows-latest
-            buildCmd: |
+            run: |
               .\ci\build_autogen.bat
 
           - id: openbsd-amd64
@@ -70,7 +70,7 @@ jobs:
             vm: true
             provision: |
               sudo pkg_add git gmake
-            buildCmd: |
+            run: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
           - id: freebsd-amd64
@@ -81,7 +81,7 @@ jobs:
             vm: true
             provision: |
               sudo pkg install -y git gmake
-            buildCmd: |
+            run: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
           - id: netbsd-amd64
@@ -91,8 +91,8 @@ jobs:
             buildHost: ubuntu-latest
             vm: true
             provision: |
-              sudo pkg_add git gmake
-            buildCmd: |
+              echo sudo pkg_add git gmake
+            run: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
     steps:
@@ -134,11 +134,11 @@ jobs:
         run: ${{ matrix.platform.provision }}
 
       - if: matrix.platform.os != 'windows' && (!matrix.platform.container && !matrix.platform.vm) && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
-        run: ${{ matrix.platform.buildCmd }}
+        run: ${{ matrix.platform.run }}
 
       - name: Build Nim (csources) (Windows)
         if: matrix.platform.os == 'windows' && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
-        run: ${{ matrix.platform.buildCmd }}
+        run: ${{ matrix.platform.run }}
         shell: cmd
         # XXX: Special case for Windows because this won't work:
         # shell: ${{ matrix.platform.shell }}
@@ -148,7 +148,9 @@ jobs:
         uses: ./.github/actions/linux_i386
         with:
           nocache: ${{ inputs.nocache }}
-          run: ${{ matrix.platform.buildCmd }}
+          run: |
+            ${{ matrix.platform.provision }}
+            ${{ matrix.platform.run }}
 
       - name: Build Nim (csources) in VM (${{ matrix.platform.id }})
         if: matrix.platform.vm && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
@@ -157,4 +159,4 @@ jobs:
           operating_system: ${{ matrix.platform.os }}
           version: ${{ matrix.platform.osVer }}
           shell: bash
-          run: ${{ matrix.platform.buildCmd }}
+          run: ${{ matrix.platform.run }}
