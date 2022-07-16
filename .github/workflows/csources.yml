@@ -84,16 +84,17 @@ jobs:
             run: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
-          # - id: netbsd-amd64
-          #   os: netbsd
-          #   osVer: '9.2'
-          #   arch: amd64
-          #   buildHost: ubuntu-latest
-          #   vm: true
-          #   provision: |
-          #     echo sudo pkg_add git gmake
-          #   run: |
-          #     . ci/funs.sh && nimBuildCsourcesIfNeeded
+          - id: netbsd-amd64
+            os: netbsd
+            osVer: '9.2'
+            arch: amd64
+            buildHost: ubuntu-latest
+            vm: true
+            provision: |
+              echo sudo pkg_add git gmake
+            run: |
+              uname
+              # . ci/funs.sh && nimBuildCsourcesIfNeeded
 
     steps:
       - uses: actions/checkout@v3
@@ -158,4 +159,6 @@ jobs:
           operating_system: ${{ matrix.platform.os }}
           version: ${{ matrix.platform.osVer }}
           shell: bash
-          run: ${{ matrix.platform.run }}
+          run: |
+            ${{ matrix.platform.provision }}
+            ${{ matrix.platform.run }}
