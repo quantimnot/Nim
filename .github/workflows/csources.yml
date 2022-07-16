@@ -92,10 +92,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/delete_caches
-        with:
-          github_token: ${{ secrets.gh_token }}
-        if: matrix.platform.id == 'linux-amd64'
 
       - id: cache-csources
         if: "!inputs.nocache"
