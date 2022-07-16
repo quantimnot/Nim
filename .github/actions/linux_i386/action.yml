@@ -34,8 +34,7 @@ runs:
     - run: |
         docker load -i docker_linux_i386.tar
         cat <<"EOF" > run.sh
-        #!/bin/bash -e
         ${{ inputs.run }}
         EOF
-        docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` nim:linux_i386 ./run.sh
+        docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` nim:linux_i386 bash -e run.sh
       shell: bash
