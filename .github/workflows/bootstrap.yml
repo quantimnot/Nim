@@ -49,7 +49,7 @@ jobs:
           path: .github
       - id: set-matrix
         run: |
-          go install -u github.com/wakeful/yaml2json
+          go install github.com/wakeful/yaml2json@latest
           echo "::set-output name=matrix::`yaml2json .github/platforms.yml`"
 
   cache:
