@@ -99,35 +99,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # - id: docker_linux_i386-cache
-      #   if: "!inputs.nocache"
-      #   uses: actions/cache@v3
-      #   with:
-      #     path: |
-      #       docker_linux_i386.tar
-      #     key: docker_linux_i386-${{ hashFiles('.github/workflows/linux_i386.Dockerfile') }}
-
-      # - if: inputs.nocache || steps.docker_linux_i386-cache.outputs.cache-hit != 'true'
-      #   shell: bash
-      #   run: |
-      #     docker build -t nim:linux_i386 - < .github/workflows/linux_i386.Dockerfile
-      #     docker save nim:linux_i386 > docker_linux_i386.tar
-
-      # - run: |
-      #     docker load -i docker_linux_i386.tar
-      #     docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t nim:linux_i386 <<EOF
-      #     ${{ inputs.run }}
-      #     exit
-      #     EOF
-      #   shell: bash
-
       - id: cache-csources
         if: "!inputs.nocache"
         uses: actions/cache@v3
         with:
           path: |
             csources
-            bin/nim_csources*
+            bin/nim
+            bin/nim_csources
+            bin/nim_csources_*
           key: csources-${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ hashFiles('config/build_config.txt') }}
 
       - name: Provision (GitHub runner)
