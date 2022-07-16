@@ -41,81 +41,14 @@ on:
 jobs:
   matrix:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform:
-          - id: linux-amd64
-            os: linux
-            arch: amd64
-            buildHost: ubuntu-latest
-            run: |
-              . ci/funs.sh && nimBuildCsourcesIfNeeded
-
-          - id: linux-i386
-            os: linux
-            arch: i386
-            buildHost: ubuntu-latest
-            container: true
-            containerImageTar: docker_linux_i386.tar
-            provision: |
-              apt-get install -yq git
-            run: |
-              . ci/funs.sh && nimBuildCsourcesIfNeeded ucpu=i386
-
-          - id: macos-amd64
-            os: macos
-            arch: amd64
-            buildHost: macos-latest
-            run: |
-              . ci/funs.sh && nimBuildCsourcesIfNeeded
-
-          - id: windows-amd64
-            os: windows
-            arch: amd64
-            buildHost: windows-latest
-            run: |
-              .\ci\build_autogen.bat
-
-          - id: openbsd-amd64
-            os: openbsd
-            osVer: '7.1'
-            arch: amd64
-            buildHost: macos-latest
-            vm: true
-            provision: |
-              sudo pkg_add git gmake
-            run: |
-              . ci/funs.sh && nimBuildCsourcesIfNeeded
-
-          - id: freebsd-amd64
-            os: freebsd
-            osVer: '12.2'
-            arch: amd64
-            buildHost: macos-latest
-            vm: true
-            provision: |
-              sudo pkg install -y git gmake
-            run: |
-              . ci/funs.sh && nimBuildCsourcesIfNeeded
-
-          - id: netbsd-amd64
-            os: netbsd
-            osVer: '9.2'
-            arch: amd64
-            buildHost: ubuntu-latest
-            vm: true
-            provision: |
-              pkg_add git gmake
-            run: |
-              . ci/funs.sh && nimBuildCsourcesIfNeeded
-
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-
     steps:
+      - uses: actions/checkout@v3
+        with:
+          path: .github
       - id: set-matrix
-        run: echo "::set-output name=matrix::${{ toJSON(matrix) }}"
-
+        run: echo "::set-output name=matrix::`yaml2json .github/platforms.yml`"
 
   cache:
     needs: matrix
