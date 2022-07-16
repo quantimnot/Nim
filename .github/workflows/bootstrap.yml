@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v3
       - id: set-matrix
         run: |
-          yq -o=json '.' .github/platforms.yml > .github/platforms.json
+          yq -o=json -I0 '.' .github/platforms.yml > .github/platforms.json
           echo "::set-output name=matrix::`cat .github/platforms.json`"
 
   cache:
