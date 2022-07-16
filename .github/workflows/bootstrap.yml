@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - id: set-matrix
-        run: echo "::set-output name=matrix::`yq r -j .github/platforms.yml`"
+        run: echo "::set-output name=matrix::`yq -o=json '.' .github/platforms.yml`"
 
   cache:
     needs: matrix
