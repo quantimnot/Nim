@@ -61,6 +61,6 @@ platform:
     buildHost: ubuntu-latest
     vm: true
     provision: |
-      pkg_add git gmake
+      echo pkg_add git gmake
     run: |
-      . ci/funs.sh && nimBuildCsourcesIfNeeded
+      echo . ci/funs.sh && nimBuildCsourcesIfNeeded
