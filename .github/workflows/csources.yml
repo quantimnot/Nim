@@ -41,8 +41,10 @@ jobs:
             os: linux
             arch: i386
             buildHost: ubuntu-latest
-            runOnDocker: true
-            dockerImage: docker_linux_i386.tar
+            container: true
+            containerImageTar: docker_linux_i386.tar
+            provision: |
+              apt-get install -yq git
             buildCmd: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded ucpu=i386
 
@@ -65,9 +67,10 @@ jobs:
             osVer: '7.1'
             arch: amd64
             buildHost: macos-latest
-            runOnVm: true
-            buildCmd: |
+            vm: true
+            provision: |
               sudo pkg_add git gmake
+            buildCmd: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
           - id: freebsd-amd64
@@ -75,9 +78,10 @@ jobs:
             osVer: '12.2'
             arch: amd64
             buildHost: macos-latest
-            runOnVm: true
-            buildCmd: |
+            vm: true
+            provision: |
               sudo pkg install -y git gmake
+            buildCmd: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
           - id: netbsd-amd64
@@ -85,13 +89,36 @@ jobs:
             osVer: '9.2'
             arch: amd64
             buildHost: ubuntu-latest
-            runOnVm: true
-            buildCmd: |
+            vm: true
+            provision: |
               sudo pkg_add git gmake
+            buildCmd: |
               . ci/funs.sh && nimBuildCsourcesIfNeeded
 
     steps:
       - uses: actions/checkout@v3
+
+      # - id: docker_linux_i386-cache
+      #   if: "!inputs.nocache"
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       docker_linux_i386.tar
+      #     key: docker_linux_i386-${{ hashFiles('.github/workflows/linux_i386.Dockerfile') }}
+
+      # - if: inputs.nocache || steps.docker_linux_i386-cache.outputs.cache-hit != 'true'
+      #   shell: bash
+      #   run: |
+      #     docker build -t nim:linux_i386 - < .github/workflows/linux_i386.Dockerfile
+      #     docker save nim:linux_i386 > docker_linux_i386.tar
+
+      # - run: |
+      #     docker load -i docker_linux_i386.tar
+      #     docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t nim:linux_i386 <<EOF
+      #     ${{ inputs.run }}
+      #     exit
+      #     EOF
+      #   shell: bash
 
       - id: cache-csources
         if: "!inputs.nocache"
@@ -102,28 +129,29 @@ jobs:
             bin/nim_csources*
           key: csources-${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ hashFiles('config/build_config.txt') }}
 
-      - id: build_all
-        if: matrix.platform.os != 'windows' && (!matrix.platform.runOnDocker && !matrix.platform.runOnVm) && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
+      - name: Provision (GitHub runner)
+        if: "!matrix.platform.container && !matrix.platform.vm"
+        run: ${{ matrix.platform.provision }}
+
+      - if: matrix.platform.os != 'windows' && (!matrix.platform.container && !matrix.platform.vm) && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         run: ${{ matrix.platform.buildCmd }}
 
-      - id: build_all_windows
-        name: Build Nim (Windows)
+      - name: Build Nim (csources) (Windows)
         if: matrix.platform.os == 'windows' && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         run: ${{ matrix.platform.buildCmd }}
         shell: cmd
         # XXX: Special case for Windows because this won't work:
         # shell: ${{ matrix.platform.shell }}
 
-      - id: build_all_with_docker
-        name: Build Nim (${{ matrix.platform.os }})
-        if: matrix.platform.runOnDocker && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
+      - name: Build Nim (csources) in container (${{ matrix.platform.id }})
+        if: matrix.platform.container && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         uses: ./.github/actions/linux_i386
         with:
           nocache: ${{ inputs.nocache }}
           run: ${{ matrix.platform.buildCmd }}
 
-      - id: build_all_with_vm
-        if: matrix.platform.runOnVm && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
+      - name: Build Nim (csources) in VM (${{ matrix.platform.id }})
+        if: matrix.platform.vm && (steps.cache-csources.outputs.cache-hit != 'true' || inputs.nocache)
         uses: cross-platform-actions/action@v0.6.2
         with:
           operating_system: ${{ matrix.platform.os }}

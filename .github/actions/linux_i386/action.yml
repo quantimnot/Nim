@@ -1,11 +1,13 @@
 name: 'Linux i386'
 description: 'Run in a Linux i386 container.'
+
 inputs:
   nocache:
     default: false
     type: boolean
   run:
     required: true
+
 runs:
   using: "composite"
   steps:
@@ -17,15 +19,20 @@ runs:
           docker_linux_i386.tar
         key: docker_linux_i386-${{ hashFiles('.github/workflows/linux_i386.Dockerfile') }}
 
-    - if: inputs.nocache || steps.cache.outputs.cache-hit != 'true'
+    - run: |
+        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       shell: bash
+
+    - if: inputs.nocache || steps.cache.outputs.cache-hit != 'true'
       run: |
         docker build -t nim:linux_i386 - < .github/workflows/linux_i386.Dockerfile
         docker save nim:linux_i386 > docker_linux_i386.tar
+      shell: bash
 
     - run: |
         docker load -i docker_linux_i386.tar
-        docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t nim:linux_i386
+        docker run --mount type=bind,src=`pwd`,dst=`pwd` -w `pwd` -t nim:linux_i386 <<EOF
         ${{ inputs.run }}
         exit
+        EOF
       shell: bash
