@@ -526,15 +526,20 @@ proc newSymNodeTypeDesc*(s: PSym; idgen: IdGenerator; info: TLineInfo): PNode =
 proc foldDefine(m, s: PSym, n: PNode; idgen: IdGenerator; g: ModuleGraph): PNode =
   result = nil
   var name = s.name.s
+  var deserializer: PNode = nil
   let prag = extractPragma(s)
   if prag != nil:
     for it in prag:
-      if it.kind in nkPragmaCallKinds and it.len == 2 and it[0].kind == nkIdent:
+      if it.kind in nkPragmaCallKinds:
         let word = whichKeyword(it[0].ident)
         if word in {wStrDefine, wIntDefine, wBoolDefine, wDefine}:
           # should be processed in pragmas.nim already
-          if it[1].kind in {nkStrLit, nkRStrLit, nkTripleStrLit}:
+          if word == wDefine and it.len == 3:
+            name = it[2].strVal
+            deserializer = newTree(nkCall, it[1], newStrNodeT(g.config.symbols[name], n, g))
+          elif it[1].kind in {nkStrLit, nkRStrLit, nkTripleStrLit}:
             name = it[1].strVal
+          else: doAssert(false)
   if isDefined(g.config, name):
     let str = g.config.symbols[name]
     case s.magic
@@ -589,8 +594,12 @@ proc foldDefine(m, s: PSym, n: PNode; idgen: IdGenerator; g: ModuleGraph): PNode
           if result.isNil:
             raise newException(ValueError, "invalid enum value: " & str)
         else:
-          localError(g.config, s.info, "unsupported type $1 for define '$2'" %
-            [typeToString(rawTyp), name])
+          if deserializer != nil:
+            result = copyTree(s.astdef)
+            result[^1] = deserializer
+          else:
+            localError(g.config, s.info, "unsupported type $1 for define '$2'" %
+              [typeToString(rawTyp), name])
       except ValueError as e:
         localError(g.config, s.info,
           "could not process define '$1' of type $2; $3" %

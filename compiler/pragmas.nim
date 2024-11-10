@@ -205,6 +205,15 @@ proc newEmptyStrNode(c: PContext; n: PNode, strVal: string = ""): PNode {.noinli
   result = newNodeIT(nkStrLit, n.info, getSysType(c.graph, n.info, tyString))
   result.strVal = strVal
 
+proc getStrLitNode(c: PContext, n: PNode, idx: int): PNode =
+  n[idx] = c.semConstExpr(c, n[idx])
+  case n[idx].kind
+  of nkStrLit, nkRStrLit, nkTripleStrLit: result = n[idx]
+  else:
+    localError(c.config, n.info, errStringLiteralExpected)
+    # error correction:
+    result = newEmptyStrNode(c, n)
+
 proc getStrLitNode(c: PContext, n: PNode): PNode =
   if n.kind notin nkPragmaCallKinds or n.len != 2:
     localError(c.config, n.info, errStringLiteralExpected)
@@ -521,9 +530,11 @@ proc processPop(c: PContext, n: PNode) =
 
 proc processDefineConst(c: PContext, n: PNode, sym: PSym, kind: TMagic) =
   sym.magic = kind
-  if n.kind in nkPragmaCallKinds and n.len == 2:
-    # could also use TLib
-    n[1] = getStrLitNode(c, n)
+  if n.kind in nkPragmaCallKinds:
+    case n.len
+    of 2: n[1] = getStrLitNode(c, n)
+    of 3: n[1] = getStrLitNode(c, n, 1)
+    else: invalidPragma(c, n)
 
 proc processDefine(c: PContext, n: PNode, sym: PSym) =
   if sym != nil and sym.kind == skConst:
