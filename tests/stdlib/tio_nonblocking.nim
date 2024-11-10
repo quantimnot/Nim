@@ -1,7 +1,7 @@
 discard """
   disabled: "win"
   targets: "c"
-  matrix: "-d:threadsafe --threads:on"
+  matrix: "-d:threadsafe --threads:on --mm:arc"
   timeout: 60
   output: "started\nstopped\nquit\n"
 """
@@ -22,7 +22,7 @@ discard """
 when not (compileOption("threads") and defined(threadsafe)):
   {.error: "-d:threadsafe --threads:on needed".}
 
-import std/[selectors, osproc, streams, os, posix]
+import std/[selectors, osproc, streams, os, files, syncio, posix, assertions, typedthreads]
 
 type
   Handler = proc() {.closure.}
