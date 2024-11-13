@@ -34,11 +34,13 @@ const
     ## refs #10268: all testament generated files should go here to avoid
     ## polluting .gitignore
 
-proc splitTestFile*(file: string): tuple[cat: string, path: string] =
+proc splitTestFile*(file: string; ignorePathStructureConstraints = false): tuple[cat: string, path: string] =
   ## At least one directory is required in the path, to use as a category name
   runnableExamples:
     doAssert splitTestFile("tests/fakedir/tfakename.nim") == ("fakedir", "tests/fakedir/tfakename.nim".unixToNativePath)
   result = ("", "")
+  if ignorePathStructureConstraints:
+    return (file.parentDir.lastPathPart, file)
   for p in file.parentDirs(inclusive = false):
     let parent = p.parentDir
     if parent.lastPathPart == testsFname:

@@ -35,6 +35,7 @@ var simulate = false
 var optVerbose = false
 var useMegatest = true
 var valgrindEnabled = true
+var ignorePathStructureConstraints = false
 
 proc verboseCmd(cmd: string) =
   if optVerbose:
@@ -751,6 +752,12 @@ proc main() =
         quit Usage
     of "skipfrom":
       skipFrom = p.val
+    of "ignorepathstructureconstraints":
+      case p.val:
+      of "off":
+        ignorePathStructureConstraints = false
+      else:
+        ignorePathStructureConstraints = true
     else:
       quit Usage
     p.next()
@@ -820,7 +827,7 @@ proc main() =
     p.next
     processPattern(r, pattern, p.cmdLineRest, simulate)
   of "r", "run":
-    let (cat, path) = splitTestFile(p.key)
+    let (cat, path) = splitTestFile(p.key, ignorePathStructureConstraints)
     processSingleTest(r, cat.Category, p.cmdLineRest, path, gTargets, targetsSet)
   of "html":
     generateHtml(resultsFile, optFailing)
