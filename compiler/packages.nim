@@ -45,6 +45,13 @@ func getPackageId*(sym: PSym): int =
   ## Return the owning package ID.
   sym.getPackageSymbol.id
 
+proc getModulePackageDir*(conf: ConfigRef; moduleSym: PSym): AbsoluteDir =
+  ## Return the absolute directory path of `moduleSym`'s package.
+  ##
+  ## See Also:
+  ## * `getModulePackageDir proc<packagehandling.html#getModulePackageDir,ConfigRef,AbsoluteFile>`_ for lookup by module path
+  getModulePackageDir(conf, AbsoluteFile toFullPath(conf, moduleSym.info))
+
 func belongsToProjectPackage*(conf: ConfigRef, sym: PSym): bool =
   ## Return whether the symbol belongs to the project's package.
   ##
@@ -52,7 +59,7 @@ func belongsToProjectPackage*(conf: ConfigRef, sym: PSym): bool =
   ## * `modulegraphs.belongsToStdlib`
   conf.mainPackageId == sym.getPackageId
 
-func belongsToProjectPackageMaybeNil*(conf: ConfigRef, sym: PSym): bool =
+func belongsToProjectPackageMaybeNil*(conf: ConfigRef, sym: PSym): bool = # TODO: remove; why would a package be nil?
   ## Return whether the symbol belongs to the project's package.
   ## Returns `false` if `sym` is nil.
   ##

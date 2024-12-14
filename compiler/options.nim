@@ -1009,7 +1009,7 @@ proc canonicalImportAux*(conf: ConfigRef, file: AbsoluteFile): string =
   system, std/tables, fusion/pointers, system/assertions, std/private/asciitables
   ]##
   var ret = getRelativePathFromConfigPath(conf, file, isTitle = true)
-  let dir = getNimbleFile(conf, $file).parentDir.AbsoluteDir
+  let dir = getModulePackageDir(conf, file)
   if not dir.isEmpty:
     let relPath = relativeTo(file, dir)
     if not relPath.isEmpty and (ret.isEmpty or relPath.string.len < ret.string.len):
