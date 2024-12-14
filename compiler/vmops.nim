@@ -40,6 +40,7 @@ else:
   from std/formatfloat import addFloatRoundtrip, addFloatSprintf
 
 from packages import getPackageSymbol, getModulePackageDir
+from condsyms import definedSymbolNames
 
 # There are some useful procs in vmconv.
 import vmconv, vmmarshal
@@ -189,6 +190,7 @@ proc querySettingSeqImpl(conf: ConfigRef, switch: BiggestInt): seq[string] =
   of commandArgs: result = conf.commandArgs
   of cincludes: copySeq(conf.cIncludes)
   of clibs: copySeq(conf.cLibs)
+  of definedSymbols: result = definedSymbolNames(conf.symbols).toSeq
 
 proc stackTrace2(c: PCtx, msg: string, n: PNode) =
   stackTrace(c, PStackFrame(prc: c.prc.sym, comesFrom: 0, next: nil), c.exceptionInstr, msg, n.info)

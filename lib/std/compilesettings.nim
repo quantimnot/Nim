@@ -48,6 +48,7 @@ type
     commandArgs,      ## the arguments passed to the Nim compiler
     cincludes,        ## the #include paths passed to the C/C++ compiler
     clibs             ## libraries passed to the C/C++ compiler
+    definedSymbols    ## externally defined symbols
 
 proc querySetting*(setting: SingleValueSetting): string {.
   compileTime, noSideEffect.} =
