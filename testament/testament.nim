@@ -163,9 +163,10 @@ proc nimcacheDir(filename, options: string, target: TTarget): string =
   result = "nimcache" / (filename & '_' & hashInput.getMD5)
 
 proc prepareTestCmd(cmdTemplate, filename, options, nimcache: string,
-                     target: TTarget, extraOptions = ""): string =
+                     target: TTarget, extraOptions = "", outDir = ""): string =
   var options = target.defaultOptions & ' ' & options
   if nimcache.len > 0: options.add(" --nimCache:$#" % nimcache.quoteShell)
+  if outDir.len > 0: options.add(" --outdir:$#" % outDir.quoteShell)
   options.add ' ' & extraOptions
   # we avoid using `parseCmdLine` which is buggy, refs bug #14343
   result = cmdTemplate % ["target", targetToCmd[target],
@@ -173,9 +174,9 @@ proc prepareTestCmd(cmdTemplate, filename, options, nimcache: string,
                       "filedir", filename.getFileDir(), "nim", compilerPrefix]
 
 proc callNimCompiler(cmdTemplate, filename, options, nimcache: string,
-                     target: TTarget, extraOptions = ""): TSpec =
+                     target: TTarget, extraOptions = "", outDir = ""): TSpec =
   result = TSpec(cmd: prepareTestCmd(cmdTemplate, filename, options, nimcache, target,
-                          extraOptions))
+                          extraOptions, outDir))
   verboseCmd(result.cmd)
   var p = startProcess(command = result.cmd,
                        options = {poStdErrToStdOut, poUsePath, poEvalCommand})
@@ -487,14 +488,19 @@ proc equalModuloLastNewline(a, b: string): bool =
   # allow lazy output spec that omits last newline, but really those should be fixed instead
   result = a == b or b.endsWith("\n") and a == b[0 ..< ^1]
 
+
+proc getExePath(test: var TTest, isJsTarget: bool, nimcache: string): string =
+  changeFileExt(test.name, if isJsTarget: "js" else: ExeExt)
+
+
 proc testSpecHelper(r: var TResults, test: var TTest, expected: TSpec,
-                    target: TTarget, extraOptions: string, nimcache: string) =
+                    target: TTarget, extraOptions: string, nimcache: string, outDir: string) =
   template maybeRetry(x: bool) =
     # if `x` is true, retries the test
     if x:
       test.spec.err = reRetry
       dec test.spec.retries
-      testSpecHelper(r, test, expected, target, extraOptions, nimcache)
+      testSpecHelper(r, test, expected, target, extraOptions, nimcache, outDir)
       return
   if test.spec.err != reRetry:
     test.startTime = epochTime()
@@ -505,7 +511,7 @@ proc testSpecHelper(r: var TResults, test: var TTest, expected: TSpec,
     r.finishTest(test, target, extraOptions, "", "", test.spec.err)
     inc(r.skipped)
     return
-  var given = callNimCompiler(expected.getCmd, test.name, test.options, nimcache, target, extraOptions)
+  var given = callNimCompiler(expected.getCmd, test.name, test.options, nimcache, target, extraOptions, outDir)
   case expected.action
   of actionCompile:
     maybeRetry compilerOutputTests(test, target, extraOptions, given, expected, r)
@@ -514,7 +520,7 @@ proc testSpecHelper(r: var TResults, test: var TTest, expected: TSpec,
       maybeRetry r.finishTestRetryable(test, target, extraOptions, "", "$ " & given.cmd & '\n' & given.nimout, given.err, givenSpec = given.addr)
     else:
       let isJsTarget = target == targetJS
-      var exeFile = changeFileExt(test.name, if isJsTarget: "js" else: ExeExt)
+      var exeFile = getExePath(test, isJsTarget, nimcache)
       if not fileExists(exeFile):
         maybeRetry r.finishTestRetryable(test, target, extraOptions, expected.output,
                     "executable not found: " & exeFile, reExeNotFound)
@@ -586,7 +592,7 @@ proc changeTarget(extraOptions: string; defaultTarget: TTarget): TTarget =
     else:
       discard
 
-proc targetHelper(r: var TResults, test: TTest, expected: TSpec, extraOptions: string) =
+proc targetHelper(r: var TResults, test: TTest, expected: TSpec, extraOptions, outDir: string) =
   for target in expected.targets:
     inc(r.total)
     if target notin gTargets:
@@ -599,7 +605,7 @@ proc targetHelper(r: var TResults, test: TTest, expected: TSpec, extraOptions: s
       let nimcache = nimcacheDir(test.name, test.options, target)
       var testClone = test
       let target = changeTarget(extraOptions, target)
-      testSpecHelper(r, testClone, expected, target, extraOptions, nimcache)
+      testSpecHelper(r, testClone, expected, target, extraOptions, nimcache, outDir)
 
 proc testSpec(r: var TResults, test: TTest, targets: set[TTarget] = {}) =
   var expected = test.spec
@@ -615,15 +621,15 @@ proc testSpec(r: var TResults, test: TTest, targets: set[TTarget] = {}) =
     expected.targets = {getTestSpecTarget()}
   if test.spec.matrix.len > 0:
     for m in test.spec.matrix:
-      targetHelper(r, test, expected, m)
+      targetHelper(r, test, expected, m, "")
   else:
-    targetHelper(r, test, expected, "")
+    targetHelper(r, test, expected, "", "")
 
-proc testSpecWithNimcache(r: var TResults, test: TTest; nimcache: string) {.used.} =
+proc testSpecWithNimcache(r: var TResults, test: TTest; nimcache, outDir: string) {.used.} =
   for target in test.spec.targets:
     inc(r.total)
     var testClone = test
-    testSpecHelper(r, testClone, test.spec, target, "", nimcache)
+    testSpecHelper(r, testClone, test.spec, target, "", nimcache, outDir)
 
 proc makeTest(test, options: string, cat: Category): TTest =
   result = TTest(

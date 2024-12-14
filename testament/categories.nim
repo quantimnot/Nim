@@ -497,19 +497,21 @@ proc icTests(r: var TResults; testsDir: string, cat: Category, options: string;
     navTestConfig = " --ic:on -d:nimIcNavigatorTests --hint:Conf:off --warnings:off "
 
   template test(x: untyped) =
-    testSpecWithNimcache(r, makeRawTest(file, x & options, cat), nimcache)
+    testSpecWithNimcache(r, makeRawTest(file, x & options, cat), nimcache, outDir)
 
   template editedTest(x: untyped) =
     var test = makeTest(file, x & options, cat)
     if isNavigatorTest:
       test.spec.action = actionCompile
     test.spec.targets = {getTestSpecTarget()}
-    testSpecWithNimcache(r, test, nimcache)
+    testSpecWithNimcache(r, test, nimcache, outDir)
 
   template checkTest() =
     var test = makeRawTest(file, options, cat)
     test.spec.cmd = compilerPrefix & " check --hint:Conf:off --warnings:off --ic:on $options " & file
-    testSpecWithNimcache(r, test, nimcache)
+    testSpecWithNimcache(r, test, nimcache, outDir)
+
+  const outDir = "."
 
   if not isNavigatorTest:
     for file in tooltests:
