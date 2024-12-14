@@ -374,49 +374,147 @@ proc mainCommand*(graph: ModuleGraph) =
   of cmdBuildindex: docLikeCmd commandBuildIndex(conf, $conf.projectFull, conf.outFile)
   of cmdGendepend: commandGenDepend(graph)
   of cmdDump:
-    if getConfigVar(conf, "dump.format") == "json":
+    let dumpFormat = getConfigVar(conf, "dump.format")
+    let dumpKey = getConfigVar(conf, "dump.get", "*")
+    case dumpFormat
+    of "json":
       wantMainModule(conf)
-
-      var definedSymbols = newJArray()
-      for s in definedSymbolNames(conf.symbols): definedSymbols.elems.add(%s)
-
-      var libpaths = newJArray()
-      var lazyPaths = newJArray()
-      for dir in conf.searchPaths: libpaths.elems.add(%dir.string)
-      for dir in conf.lazyPaths: lazyPaths.elems.add(%dir.string)
-
-      var hints = newJObject() # consider factoring with `listHints`
-      for a in hintMin..hintMax:
-        hints[$a] = %(a in conf.notes)
-      var warnings = newJObject()
-      for a in warnMin..warnMax:
-        warnings[$a] = %(a in conf.notes)
-
-      var dumpdata = %[
-        (key: "version", val: %VersionAsString),
-        (key: "nimExe", val: %(getAppFilename())),
-        (key: "prefixdir", val: %conf.getPrefixDir().string),
-        (key: "libpath", val: %conf.libpath.string),
-        (key: "project_path", val: %conf.projectFull.string),
-        (key: "defined_symbols", val: definedSymbols),
-        (key: "lib_paths", val: %libpaths),
-        (key: "lazyPaths", val: %lazyPaths),
-        (key: "outdir", val: %conf.outDir.string),
-        (key: "out", val: %conf.outFile.string),
-        (key: "nimcache", val: %getNimcacheDir(conf).string),
-        (key: "hints", val: hints),
-        (key: "warnings", val: warnings),
-      ]
-
+      var dumpdata = newJObject()
+      template dumpVersion: untyped =
+        dumpdata.add("version", %VersionAsString)
+      template dumpNimExe: untyped =
+        dumpdata.add("nimExe", %(getAppFilename()))
+      template dumpPrefixDir: untyped =
+        dumpdata.add("prefixdir", %conf.getPrefixDir().string)
+      template dumpLibPath: untyped =
+        dumpdata.add("libpath", %conf.libpath.string)
+      template dumpProjectPath: untyped =
+        dumpdata.add("project_path", %conf.projectFull.string)
+      template dumpPackageDir: untyped =
+        dumpdata.add("package", %(conf.getPackageName(conf.projectFull)))
+      template dumpPackageDir: untyped =
+        dumpdata.add("package_dir", %(conf.getModulePackageDir(conf.projectFull).string))
+      template dumpDefinedSymbols: untyped =
+        var definedSymbols = newJArray()
+        for s in definedSymbolNames(conf.symbols): definedSymbols.elems.add(%s)
+        dumpdata.add("defined_symbols", definedSymbols)
+      template dumpLibPaths: untyped =
+        var libpaths = newJArray()
+        for dir in conf.searchPaths: libpaths.elems.add(%dir.string)
+        dumpdata.add("lib_paths", %libpaths)
+      template dumpLazyPaths: untyped =
+        var lazyPaths = newJArray()
+        for dir in conf.lazyPaths: lazyPaths.elems.add(%dir.string)
+        dumpdata.add("lazyPaths", %lazyPaths)
+      template dumpOutDir: untyped =
+        dumpdata.add("outdir", %conf.outDir.string)
+      template dumpOutFile: untyped =
+        dumpdata.add("out", %conf.outFile.string)
+      template dumpNimcacheDir: untyped =
+        dumpdata.add("nimcache", %getNimcacheDir(conf).string)
+      template dumpHints: untyped =
+        var hints = newJObject() # consider factoring with `listHints`
+        for a in hintMin..hintMax:
+          hints[$a] = %(a in conf.notes)
+        dumpdata.add("hints", hints)
+      template dumpWarnings: untyped =
+        var warnings = newJObject()
+        for a in warnMin..warnMax:
+          warnings[$a] = %(a in conf.notes)
+        dumpdata.add("warnings", warnings)
+      case dumpKey
+      of "version": dumpVersion
+      of "nimExe": dumpNimExe
+      of "prefixdir": dumpPrefixDir
+      of "libpath": dumpLibPath
+      of "project_path": dumpProjectPath
+      of "package_dir": dumpPackageDir
+      of "defined_symbols": dumpDefinedSymbols
+      of "lib_paths": dumpLibPaths
+      of "lazyPaths": dumpLazyPaths
+      of "outdir": dumpOutDir
+      of "out": dumpOutFile
+      of "nimcache": dumpNimcacheDir
+      of "hints": dumpHints
+      of "warnings": dumpWarnings
+      of "*":
+        dumpVersion
+        dumpNimExe
+        dumpPrefixDir
+        dumpLibPath
+        dumpProjectPath
+        dumpPackageDir
+        dumpDefinedSymbols
+        dumpLibPaths
+        dumpLazyPaths
+        dumpOutDir
+        dumpOutFile
+        dumpNimcacheDir
+        dumpHints
+        dumpWarnings
+      else: rawMessage(conf, errGenerated, "invalid config key: " & dumpKey)
       msgWriteln(conf, $dumpdata, {msgStdout, msgSkipHook, msgNoUnitSep})
         # `msgNoUnitSep` to avoid generating invalid json, refs bug #17853
     else:
-      msgWriteln(conf, "-- list of currently defined symbols --",
-                 {msgStdout, msgSkipHook, msgNoUnitSep})
-      for s in definedSymbolNames(conf.symbols): msgWriteln(conf, s, {msgStdout, msgSkipHook, msgNoUnitSep})
-      msgWriteln(conf, "-- end of list --", {msgStdout, msgSkipHook})
-
-      for it in conf.searchPaths: msgWriteln(conf, it.string)
+      template dumpVersion: untyped =
+        msgWriteln(conf, VersionAsString, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpNimExe: untyped =
+        msgWriteln(conf, getAppFilename(), {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpPrefixDir: untyped =
+        msgWriteln(conf, conf.getPrefixDir().string, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpLibPath: untyped =
+        msgWriteln(conf, conf.libpath.string, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpProjectPath: untyped =
+        msgWriteln(conf, conf.projectFull.string, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpDefinedSymbols: untyped =
+        var definedSymbols = newJArray()
+        for s in definedSymbolNames(conf.symbols): definedSymbols.elems.add(%s)
+        msgWriteln(conf, $definedSymbols, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpLibPaths: untyped =
+        var libpaths = newJArray()
+        for dir in conf.searchPaths: libpaths.elems.add(%dir.string)
+        msgWriteln(conf, $libpaths, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpLazyPaths: untyped =
+        var lazyPaths = newJArray()
+        for dir in conf.lazyPaths: lazyPaths.elems.add(%dir.string)
+        msgWriteln(conf, $lazyPaths, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpOutDir: untyped =
+        msgWriteln(conf, conf.outDir.string, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpOutFile: untyped =
+        msgWriteln(conf, conf.outFile.string, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpNimcacheDir: untyped =
+        msgWriteln(conf, getNimcacheDir(conf).string, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpHints: untyped =
+        var hints = newJObject() # consider factoring with `listHints`
+        for a in hintMin..hintMax:
+          hints[$a] = %(a in conf.notes)
+        msgWriteln(conf, $hints, {msgStdout, msgSkipHook, msgNoUnitSep})
+      template dumpWarnings: untyped =
+        var warnings = newJObject()
+        for a in warnMin..warnMax:
+          warnings[$a] = %(a in conf.notes)
+        msgWriteln(conf, $warnings, {msgStdout, msgSkipHook, msgNoUnitSep})
+      case dumpKey
+      of "version": dumpVersion
+      of "nimExe": dumpNimExe
+      of "prefixdir": dumpPrefixDir
+      of "libpath": dumpLibPath
+      of "project_path": dumpProjectPath
+      of "defined_symbols": dumpDefinedSymbols
+      of "lib_paths": dumpLibPaths
+      of "lazyPaths": dumpLazyPaths
+      of "outdir": dumpOutDir
+      of "out": dumpOutFile
+      of "nimcache": dumpNimcacheDir
+      of "hints": dumpHints
+      of "warnings": dumpWarnings
+      of "*":
+        msgWriteln(conf, "-- list of currently defined symbols --",
+                  {msgStdout, msgSkipHook, msgNoUnitSep})
+        for s in definedSymbolNames(conf.symbols): msgWriteln(conf, s, {msgStdout, msgSkipHook, msgNoUnitSep})
+        msgWriteln(conf, "-- end of list --", {msgStdout, msgSkipHook})
+        for it in conf.searchPaths: msgWriteln(conf, it.string)
+      else: rawMessage(conf, errGenerated, "invalid config key: " & dumpKey)
   of cmdCheck:
     commandCheck(graph)
   of cmdM:
