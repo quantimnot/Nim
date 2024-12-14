@@ -7,7 +7,7 @@
 #    distribution, for details about the copyright.
 #
 
-import std/[os, strutils, parseopt]
+import std/[os, strutils, parseopt, osproc]
 
 when defined(nimPreviewSlimSystem):
   import std/assertions
@@ -94,6 +94,15 @@ proc getNimRunOptionsAlways(conf: ConfigRef): string =
 proc getNimRunFormat(conf: ConfigRef): string =
   conf.getConfigVar("nimrun.format", "$runner $runnerOpts $prog $args")
 
+##########################
+#region OS Signal Handlers
+##########################
+import std/exitprocs
+import std/posix
+when not defined posix:
+  {.error: "This program only works on POSIX systems".}
+#endregion
+var process: Process
 
 proc handleCmdLine(cache: IdentCache; conf: ConfigRef) =
   let self = NimProg(
@@ -144,6 +153,23 @@ proc handleCmdLine(cache: IdentCache; conf: ConfigRef) =
           "prog", output.quoteShell,
           "args", conf.arguments]).strip(leading=true,trailing=true)
       execExternalProgram(conf, cmd.strip(leading=false,trailing=true))
+      process = startProcess(cmd, options={poEvalCommand, poParentStreams})
+      proc reapChildProcess {.noconv.} =
+        terminate process
+      proc onTerminate(signal: cint) {.noconv.} =
+        when compileOption("threads"):
+          # TODO: not sure if this needed, just copy-pasted from an example
+          # workaround for https://github.com/nim-lang/Nim/issues/4057
+          setupForeignThreadGC()
+        reapChildProcess()
+      proc setupSignalHandlers() =
+        # signal(SIGCHLD, SIG_IGN);
+        signal(SIGTERM, onTerminate)
+        signal(SIGSTOP, onTerminate)
+        signal(SIGKILL, onTerminate)
+      setupSignalHandlers()
+      if process.waitForExit != QuitSuccess:
+        rawMessage(conf, errGenerated, "execution of an external program failed: '$1'" % cmd)
     of cmdDocLike, cmdRst2html, cmdRst2tex, cmdMd2html, cmdMd2tex: # bugfix(cmdRst2tex was missing)
       if conf.arguments.len > 0:
         # reserved for future use
