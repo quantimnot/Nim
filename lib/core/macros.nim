@@ -1212,6 +1212,9 @@ proc last*(node: NimNode): NimNode = node[node.len-1]
 
 
 const
+  DefNodes* = {nnkProcDef, nnkFuncDef, nnkMethodDef, nnkIteratorDef,
+               nnkTemplateDef, nnkConverterDef, nnkMacroDef, nnkTypeDef,
+               nnkConstDef, nnkIdentDefs, nnkEnumFieldDef}
   RoutineNodes* = {nnkProcDef, nnkFuncDef, nnkMethodDef, nnkDo, nnkLambda,
                    nnkIteratorDef, nnkTemplateDef, nnkConverterDef, nnkMacroDef}
   AtomicNodes* = {nnkNone..nnkNilLit}
@@ -1309,9 +1312,9 @@ proc copyChildrenTo*(src, dest: NimNode) =
 template expectRoutine(node: NimNode) =
   expectKind(node, RoutineNodes)
 
-proc name*(someProc: NimNode): NimNode =
-  someProc.expectRoutine
-  result = someProc[0]
+proc name*(node: NimNode): NimNode =
+  expectKind(node, DefNodes)
+  result = node[0]
   if result.kind == nnkPostfix:
     if result[1].kind == nnkAccQuoted:
       result = result[1][0]
@@ -1320,11 +1323,11 @@ proc name*(someProc: NimNode): NimNode =
   elif result.kind == nnkAccQuoted:
     result = result[0]
 
-proc `name=`*(someProc: NimNode; val: NimNode) =
-  someProc.expectRoutine
-  if someProc[0].kind == nnkPostfix:
-    someProc[0][1] = val
-  else: someProc[0] = val
+proc `name=`*(node: NimNode; val: NimNode) =
+  expectKind(node, DefNodes)
+  if node[0].kind == nnkPostfix:
+    node[0][1] = val
+  else: node[0] = val
 
 proc params*(someProc: NimNode): NimNode =
   if someProc.kind in {nnkProcTy, nnkIteratorTy}:
