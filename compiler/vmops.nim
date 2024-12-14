@@ -39,6 +39,7 @@ when defined(nimPreviewSlimSystem):
 else:
   from std/formatfloat import addFloatRoundtrip, addFloatSprintf
 
+from packages import getPackageSymbol, getModulePackageDir
 
 # There are some useful procs in vmconv.
 import vmconv, vmmarshal
@@ -153,25 +154,27 @@ proc staticWalkDirImpl(path: string, relative: bool): PNode =
 
 from std / compilesettings import SingleValueSetting, MultipleValueSetting
 
-proc querySettingImpl(conf: ConfigRef, switch: BiggestInt): string =
+proc querySettingImpl(ctx: PCtx, switch: BiggestInt): string =
   {.push warning[Deprecated]:off.}
   case SingleValueSetting(switch)
-  of arguments: result = conf.arguments
-  of outFile: result = conf.outFile.string
-  of outDir: result = conf.outDir.string
-  of nimcacheDir: result = conf.getNimcacheDir().string
-  of projectName: result = conf.projectName
-  of projectPath: result = conf.projectPath.string
-  of projectFull: result = conf.projectFull.string
-  of command: result = conf.command
-  of commandLine: result = conf.commandLine
-  of linkOptions: result = conf.linkOptions
-  of compileOptions: result = conf.compileOptions
-  of ccompilerPath: result = conf.cCompilerPath
-  of backend: result = $conf.backend
-  of libPath: result = conf.libpath.string
-  of gc: result = $conf.selectedGC
-  of mm: result = $conf.selectedGC
+  of arguments: result = ctx.config.arguments
+  of outFile: result = ctx.config.outFile.string
+  of outDir: result = ctx.config.outDir.string
+  of nimcacheDir: result = ctx.config.getNimcacheDir().string
+  of projectName: result = ctx.config.projectName
+  of projectPath: result = ctx.config.projectPath.string
+  of projectFull: result = ctx.config.projectFull.string
+  of packageName: result = ctx.module.getPackageSymbol.name.s
+  of packageDir: result = ctx.config.getModulePackageDir(ctx.module).string
+  of command: result = ctx.config.command
+  of commandLine: result = ctx.config.commandLine
+  of linkOptions: result = ctx.config.linkOptions
+  of compileOptions: result = ctx.config.compileOptions
+  of ccompilerPath: result = ctx.config.cCompilerPath
+  of backend: result = $ctx.config.backend
+  of libPath: result = ctx.config.libpath.string
+  of gc: result = $ctx.config.selectedGC
+  of mm: result = $ctx.config.selectedGC
   {.pop.}
 
 proc querySettingSeqImpl(conf: ConfigRef, switch: BiggestInt): seq[string] =
@@ -274,7 +277,7 @@ proc registerAdditionalOps*(c: PCtx) =
     registerCallback c, "stdlib.staticos.staticFileExists", proc (a: VmArgs) {.nimcall.} =
       setResult(a, fileExists(getString(a, 0)))
     registerCallback c, "stdlib.compilesettings.querySetting", proc (a: VmArgs) =
-      setResult(a, querySettingImpl(c.config, getInt(a, 0)))
+      setResult(a, querySettingImpl(c, getInt(a, 0)))
     registerCallback c, "stdlib.compilesettings.querySettingSeq", proc (a: VmArgs) =
       setResult(a, querySettingSeqImpl(c.config, getInt(a, 0)))
 

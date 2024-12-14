@@ -37,6 +37,8 @@ type
     libPath           ## the absolute path to the stdlib library, i.e. nim's `--lib`, since 1.5.1
     gc {.deprecated.} ## gc selected
     mm                ## memory management selected
+    packageName       ## the name of the package that is being compiled
+    packageDir        ## the directory of the package that is being compiled
 
   MultipleValueSetting* {.pure.} = enum ## \
                       ## settings resulting in a seq of string values
