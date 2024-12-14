@@ -86,14 +86,14 @@ proc processCmdLine(pass: TCmdLinePass, cmd: string; config: ConfigRef) =
     disableNimblePath(config)
 
 proc getNimRunExe(conf: ConfigRef): string =
-  # xxx consider defining `conf.getConfigVar("nimrun.exe")` to allow users to
-  # customize the binary to run the command with, e.g. for custom `nodejs` or `wine`.
-  if conf.isDefined("mingw"):
-    if conf.isDefined("i386"): result = "wine"
-    elif conf.isDefined("amd64"): result = "wine64"
-    else: result = ""
-  else:
-    result = ""
+  conf.getConfigVar("nimrun.exe")
+
+proc getNimRunOptionsAlways(conf: ConfigRef): string =
+  conf.getConfigVar("nimrun.options.always")
+
+proc getNimRunFormat(conf: ConfigRef): string =
+  conf.getConfigVar("nimrun.format", "$runner $runnerOpts $prog $args")
+
 
 proc handleCmdLine(cache: IdentCache; conf: ConfigRef) =
   let self = NimProg(
@@ -133,20 +133,16 @@ proc handleCmdLine(cache: IdentCache; conf: ConfigRef) =
     case conf.cmd
     of cmdBackends, cmdTcc:
       let nimRunExe = getNimRunExe(conf)
-      var cmdPrefix = ""
-      if nimRunExe.len > 0: cmdPrefix.add nimRunExe.quoteShell
-      case conf.backend
-      of backendC, backendCpp, backendObjc: discard
-      of backendJs:
-        # D20210217T215950:here this flag is needed for node < v15.0.0, otherwise
-        # tasyncjs_fail` would fail, refs https://nodejs.org/api/cli.html#cli_unhandled_rejections_mode
-        if cmdPrefix.len == 0: cmdPrefix = findNodeJs().quoteShell
-        cmdPrefix.add " --unhandled-rejections=strict"
-      else: raiseAssert $conf.backend
-      if cmdPrefix.len > 0: cmdPrefix.add " "
-        # without the `cmdPrefix.len > 0` check, on windows you'd get a cryptic:
-        # `The parameter is incorrect`
-      let cmd = cmdPrefix & output.quoteShell & ' ' & conf.arguments
+      let nimRunFmt = getNimRunFormat(conf)
+      let nimRunOptionsAlways = getNimRunOptionsAlways(conf)
+      if conf.backend notin {backendC, backendCpp, backendObjc, backendJs}:
+        raiseAssert "`nim run` not supported for backend: " & $conf.backend
+      let cmd =
+        (nimRunFmt % [
+          "runner", nimRunExe,
+          "runnerOpts", nimRunOptionsAlways,
+          "prog", output.quoteShell,
+          "args", conf.arguments]).strip(leading=true,trailing=true)
       execExternalProgram(conf, cmd.strip(leading=false,trailing=true))
     of cmdDocLike, cmdRst2html, cmdRst2tex, cmdMd2html, cmdMd2tex: # bugfix(cmdRst2tex was missing)
       if conf.arguments.len > 0:
