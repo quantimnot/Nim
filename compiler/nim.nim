@@ -152,7 +152,7 @@ proc handleCmdLine(cache: IdentCache; conf: ConfigRef) =
           "runnerOpts", nimRunOptionsAlways,
           "prog", output.quoteShell,
           "args", conf.arguments]).strip(leading=true,trailing=true)
-      execExternalProgram(conf, cmd.strip(leading=false,trailing=true))
+      # execExternalProgram(conf, cmd.strip(leading=false,trailing=true))
       process = startProcess(cmd, options={poEvalCommand, poParentStreams})
       proc reapChildProcess {.noconv.} =
         terminate process
