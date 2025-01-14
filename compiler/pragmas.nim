@@ -65,7 +65,7 @@ const
     wStyleChecks, wAssertions,
     wWarnings, wHints,
     wLineDir, wStackTrace, wLineTrace, wOptimization,
-    wFloatChecks, wInfChecks, wNanChecks}
+    wFloatChecks, wInfChecks, wNanChecks, wDebugger}
   lambdaPragmas* = {FirstCallConv..LastCallConv,
     wNoSideEffect, wSideEffect, wNoreturn, wNosinks, wDynlib, wHeader,
     wThread, wAsmNoStackFrame,
@@ -1206,9 +1206,23 @@ proc singlePragma(c: PContext, sym: PSym, n: PNode, i: var int,
       of wChecks, wObjChecks, wFieldChecks, wRangeChecks, wBoundChecks,
          wOverflowChecks, wNilChecks, wAssertions, wWarnings, wHints,
          wLineDir, wOptimization, wStaticBoundchecks, wStyleChecks,
-         wCallconv, wDebugger, wProfiler,
+         wCallconv, wProfiler,
          wFloatChecks, wNanChecks, wInfChecks, wPatterns, wTrMacros:
         processOption(c, it, c.config.options)
+      of wDebugger:
+        # if optCDebug in c.config.globalOptions:
+        when compileOption("debugger"):
+          if (it.kind in nkPragmaCallKinds and it.len > 1) and (it[1].kind in nkPragmaCallKinds):
+            case it[1][0].ident.s
+            of "call":
+              case it[1][1].ident.s:
+              of "enteringDebugSection": enteringDebugSection()
+              of "exitingDebugSection": exitingDebugSection()
+              else: invalidPragma(c, it)
+            else: invalidPragma(c, it)
+          else:
+            debugEcho treeToYaml(c.config, it)
+            invalidPragma(c, it)
       of wStackTrace, wLineTrace:
         if sym.kind in {skProc, skMethod, skConverter}:
           processOption(c, it, sym.options)
