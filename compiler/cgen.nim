@@ -2623,3 +2623,4 @@ proc cgenWriteModules*(backend: RootRef, config: ConfigRef) =
     m.writeModule(pending=true)
   writeMapping(config, g.mapping)
   if g.generatedHeader != nil: writeHeader(g.generatedHeader)
+  writeJsonCompilationDatabase(config)

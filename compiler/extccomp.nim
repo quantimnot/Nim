@@ -1186,3 +1186,21 @@ proc writeMapping*(conf: ConfigRef; symbolMapping: Rope) =
   let filename = conf.projectPath / RelativeFile"mapping.txt"
   if not writeRope(code, filename):
     rawMessage(conf, errGenerated, "could not write to file: " & filename.string)
+
+proc writeJsonCompilationDatabase*(conf: ConfigRef) =
+  ## Generates a `compile_commands.json` file that adheres to the Clang format.
+  ##
+  ## See https://clang.llvm.org/docs/JSONCompilationDatabase.html
+  type JsonCompilationDatabase = object
+    directory: string
+    arguments: seq[string]
+    file: string
+  let filePath = getNimcacheDir(conf) / RelativeFile"compile_commands.json"
+  var db = newSeq[JsonCompilationDatabase](conf.toCompile.len)
+  let cwd = getCurrentDir()
+  for it in conf.toCompile:
+    db.add JsonCompilationDatabase(
+      directory: cwd,
+      file: relativeTo(it.cname, AbsoluteDir(cwd)).string,
+      arguments: getCompileCFileCmd(conf, it).split(' '))
+  writeFile(filePath.string, $db.toJson)
