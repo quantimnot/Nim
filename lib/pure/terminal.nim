@@ -550,6 +550,26 @@ else:
     else:
       f.write("\e[1J")
 
+proc eraseArea*(f: File, topLeft, bottomRight: type getCursorPos()) =
+  ## Erases the area between two coordinates: topLeft and bottomRight.
+  when defined(windows):
+    let h = conHandle(f)
+    var scrbuf: CONSOLE_SCREEN_BUFFER_INFO
+    if getConsoleScreenBufferInfo(h, addr(scrbuf)) == 0:
+      raiseOSError(osLastError())
+    for y in topLeft.y .. bottomRight.y:
+      var numwrote: DWORD
+      var coord = COORD(x: int16(topLeft.x), y: int16(y))
+      let length = DWORD(bottomRight.x - topLeft.x + 1)
+      if fillConsoleOutputCharacter(h, ' ', length, coord, addr(numwrote)) == 0:
+        raiseOSError(osLastError())
+      if fillConsoleOutputAttribute(h, scrbuf.wAttributes, length, coord, addr(numwrote)) == 0:
+        raiseOSError(osLastError())
+  else:
+    for y in topLeft.y .. bottomRight.y:
+      setCursorPos(f, topLeft.x, y)
+      f.write("\e[K") # Clear from cursor to end of line
+
 proc eraseLine*(f: File) =
   ## Erases the entire current line.
   runnableExamples("-r:off"):
