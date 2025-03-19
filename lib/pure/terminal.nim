@@ -311,7 +311,7 @@ else:
       # restore previous terminal mode
       discard fd.tcSetAttr(TCSADRAIN, addr oldMode)
 
-    return (parseInt(xStr), parseInt(yStr))
+    return (parseInt(xStr)-1, parseInt(yStr)-1)
 
   proc terminalWidthIoctl*(fds: openArray[int]): int =
     ## Returns terminal width from first fd that supports the ioctl.
