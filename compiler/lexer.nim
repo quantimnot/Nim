@@ -817,17 +817,18 @@ proc getCharacter(L: var Lexer; tok: var Token) =
     tokenEndIgnore(tok, L.bufpos)
 
 const
-  UnicodeOperatorStartChars = {'\226', '\194', '\195'}
+  UnicodeOperatorStartChars = {'\226', '\194', '\195', '\xE2'}
     # the allowed unicode characters ("∙ ∘ × ★ ⊗ ⊘ ⊙ ⊛ ⊠ ⊡ ∩ ∧ ⊓ ± ⊕ ⊖ ⊞ ⊟ ∪ ∨ ⊔")
     # all start with one of these.
 
 type
   UnicodeOprPred = enum
-    Mul, Add
+    Mul, Add, Equal
 
 proc unicodeOprLen(buf: cstring; pos: int): (int8, UnicodeOprPred) =
   template m(len): untyped = (int8(len), Mul)
   template a(len): untyped = (int8(len), Add)
+  template e(len): untyped = (int8(len), Equal)
   result = 0.m
   case buf[pos]
   of '\226':
@@ -852,6 +853,7 @@ proc unicodeOprLen(buf: cstring; pos: int): (int8, UnicodeOprPred) =
       elif buf[pos+2] == '\160': result = 3.m # ⊠
       elif buf[pos+2] == '\161': result = 3.m # ⊡
     elif buf[pos+1] == '\152' and buf[pos+2] == '\133': result = 3.m # ★
+    elif buf[pos+1] == '\137' and buf[pos+2] == '\136': result = 3.e # ≈
   of '\194':
     if buf[pos+1] == '\177': result = 2.a # ±
   of '\195':
@@ -971,7 +973,11 @@ proc getPrecedence*(tok: Token): int =
       else:
         let (len, pred) = unicodeOprLen(cstring(tok.ident.s), 0)
         if len != 0:
-          result = if pred == Mul: MulPred else: PlusPred
+          result =
+            case pred:
+            of Mul: MulPred
+            of Add: PlusPred
+            of Equal: 5
         else:
           result = 2
     else: considerAsgn(2)
