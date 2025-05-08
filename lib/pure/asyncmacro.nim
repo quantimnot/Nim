@@ -66,8 +66,8 @@ proc createFutureVarCompletions(futureVarIdents: seq[NimNode], fromNode: NimNode
     result.add newIfStmt(
       (
         newCall(newIdentNode("not"),
-                newDotExpr(ident, newIdentNode("finished"))),
-        newCallWithLineInfo(fromNode, newIdentNode("complete"), ident)
+                newDotExpr(ident, bindSym("finished"))),
+        newCallWithLineInfo(fromNode, bindSym("complete"), ident)
       )
     )
 
@@ -83,14 +83,14 @@ proc processBody(ctx: Context; node, needsCompletionSym, retFutParamSym: NimNode
     ctx.hasRet = true
     if node[0].kind == nnkEmpty:
       if ctx.inTry == 0:
-        result.add newCallWithLineInfo(node, newIdentNode("complete"), retFutParamSym, newIdentNode("result"))
+        result.add newCallWithLineInfo(node, bindSym("complete"), retFutParamSym, newIdentNode("result"))
       else:
         result.add newAssignment(needsCompletionSym, newLit(true))
     else:
       let x = processBody(ctx, node[0], needsCompletionSym, retFutParamSym, futureVarIdents)
       if x.kind == nnkYieldStmt: result.add x
       elif ctx.inTry == 0:
-        result.add newCallWithLineInfo(node, newIdentNode("complete"), retFutParamSym, x)
+        result.add newCallWithLineInfo(node, bindSym("complete"), retFutParamSym, x)
       else:
         result.add newAssignment(newIdentNode("result"), x)
         result.add newAssignment(needsCompletionSym, newLit(true))
@@ -114,7 +114,7 @@ proc processBody(ctx: Context; node, needsCompletionSym, retFutParamSym: NimNode
           stmtNode.add child
         stmtNode.add newIfStmt(
           ( needsCompletionSym,
-            newCallWithLineInfo(node, newIdentNode("complete"), retFutParamSym,
+            newCallWithLineInfo(node, bindSym("complete"), retFutParamSym,
             newIdentNode("result")
             )
           )
@@ -150,13 +150,13 @@ proc getFutureVarIdents(params: NimNode): seq[NimNode] =
       ## eqIdent: first char is case sensitive!!!
       result.add(params[i][0])
 
-proc isInvalidReturnType(typeName: string): bool =
-  return typeName notin ["Future"] #, "FutureStream"]
+proc isInvalidReturnType(typeName: NimNode): bool =
+  not typeName.eqIdent("Future")
 
-proc verifyReturnType(typeName: string, node: NimNode = nil) =
+proc verifyReturnType(typeName: NimNode, node: NimNode = nil) =
   if typeName.isInvalidReturnType:
     error("Expected return type of 'Future' got '$1'" %
-          typeName, node)
+          repr(typeName), node)
 
 template await*(f: typed): untyped {.used.} =
   static:
@@ -212,18 +212,30 @@ proc asyncSingleProc(prc: NimNode): NimNode =
     returnType = returnType[1]
   # Verify that the return type is a Future[T]
   if returnType.kind == nnkBracketExpr:
-    let fut = repr(returnType[0])
+    case returnType[0].kind
+    of nnkDotExpr:
+      let fut = ident repr(returnType[0][1])
+      verifyReturnType(fut, returnType[0])
+      baseType = returnType[1]
+    of nnkIdent:
+      let fut = ident repr(returnType[0])
+      verifyReturnType(fut, returnType[0])
+      baseType = returnType[1]
+    else:
+      error("Expected return type of 'Future' got '" & repr(returnType) & "'", prc)
+  elif returnType.kind == nnkDotExpr:
+    let fut = ident repr(returnType[1])
     verifyReturnType(fut, returnType[0])
-    baseType = returnType[1]
+    baseType = returnType[2]
   elif returnType.kind in nnkCallKinds and returnType[0].eqIdent("[]"):
-    let fut = repr(returnType[1])
+    let fut = ident repr(returnType[1])
     verifyReturnType(fut, returnType[0])
     baseType = returnType[2]
   elif returnType.kind == nnkEmpty:
     baseType = returnType
   else:
     baseType = nil
-    verifyReturnType(repr(returnType), returnType)
+    verifyReturnType(ident repr(returnType), returnType)
 
   let futureVarIdents = getFutureVarIdents(prc.params)
   var outerProcBody = newNimNode(nnkStmtList, prc.body)
@@ -234,7 +246,7 @@ proc asyncSingleProc(prc: NimNode): NimNode =
   let body2 = extractDocCommentsAndRunnables(prc.body)
 
   var subRetType =
-    if returnType.kind == nnkEmpty: newIdentNode("void")
+    if returnType.kind == nnkEmpty: bindSym("void")
     else: baseType
   let retFutParamSym = genSym(nskParam, "retFutParamSym")
 
@@ -273,16 +285,16 @@ proc asyncSingleProc(prc: NimNode): NimNode =
     procBody.add quote do:
       complete(`retFutParamSym`, `resultIdent`)
 
-    var retFutureTyp = newNimNode(nnkBracketExpr, prc).add(newIdentNode("Future")).add(subRetType)
+    var retFutureTyp = newNimNode(nnkBracketExpr, prc).add(bindSym("Future")).add(subRetType)
     var retFutureParam = newNimNode(nnkIdentDefs, prc).add(retFutParamSym).add(retFutureTyp).add(newEmptyNode())
     var closureIterator = newProc(iteratorNameSym, [quote do: owned(FutureBase), retFutureParam],
                                   procBody, nnkIteratorDef)
     closureIterator.pragma = newNimNode(nnkPragma, lineInfoFrom = prc.body)
-    closureIterator.addPragma(newIdentNode("closure"))
+    closureIterator.addPragma(ident("closure"))
 
     # If proc has an explicit gcsafe pragma, we add it to iterator as well.
-    if prc.pragma.findChild(it.kind in {nnkSym, nnkIdent} and $it == "gcsafe") != nil:
-      closureIterator.addPragma(newIdentNode("gcsafe"))
+    if prc.pragma.findChild(it.kind in {nnkSym, nnkIdent} and it.eqIdent("gcsafe")) != nil:
+      closureIterator.addPragma(ident("gcsafe"))
     outerProcBody.add(closureIterator)
 
     # -> createCb()
@@ -303,7 +315,7 @@ proc asyncSingleProc(prc: NimNode): NimNode =
       newVarStmt(retFutureSym,
         newCall(
           newNimNode(nnkBracketExpr, prc.body).add(
-            newIdentNode("newFuture"),
+            bindSym("newFuture"),
             subRetType),
         newLit(prcName)))) # Get type from return type of this proc
 
@@ -352,9 +364,17 @@ proc stripReturnType(returnType: NimNode): NimNode =
   # Strip out the 'Future' from 'Future[T]'.
   result = returnType
   if returnType.kind == nnkBracketExpr:
-    let fut = repr(returnType[0])
-    verifyReturnType(fut, returnType)
-    result = returnType[1]
+    case returnType[0].kind
+    of nnkDotExpr:
+      let fut = ident repr(returnType[0][1])
+      verifyReturnType(fut, returnType[0])
+      result = returnType[0][1]
+    of nnkIdent:
+      let fut = ident repr(returnType[0])
+      verifyReturnType(fut, returnType[0])
+      result = returnType[1]
+    else:
+      error("Expected return type of 'Future' got '" & repr(returnType), returnType)
 
 proc splitProc(prc: NimNode): (NimNode, NimNode) =
   ## Takes a procedure definition which takes a generic union of arguments,
