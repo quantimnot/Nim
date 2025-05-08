@@ -931,6 +931,7 @@ proc default*[T](_: typedesc[T]): T {.magic: "Default", noSideEffect.} =
 proc reset*[T](obj: var T) {.noSideEffect.} =
   ## Resets an object `obj` to its default value.
   when nimvm:
+    mixin default
     obj = default(typeof(obj))
   else:
     when defined(gcDestructors):
@@ -938,6 +939,7 @@ proc reset*[T](obj: var T) {.noSideEffect.} =
         `=destroy`(obj)
         `=wasMoved`(obj)
     else:
+      mixin default
       obj = default(typeof(obj))
 
 proc setLen*[T](s: var seq[T], newlen: Natural) {.
@@ -1260,7 +1262,7 @@ proc insert*[T](x: var seq[T], item: sink T, i = 0.Natural) {.noSideEffect.} =
       defaultImpl()
     else:
       when defined(js):
-        var it : T
+        var it = default T # Use `default` to support `.requiresInit`
         {.emit: "`x` = `x` || []; `x`.splice(`i`, 0, `it`);".}
       else:
         defaultImpl()
