@@ -413,7 +413,7 @@ proc hasYieldsInExpressions(n: PNode): bool =
         return true
 
 proc exprToStmtList(n: PNode): tuple[s, res: PNode] =
-  assert(n.kind == nkStmtListExpr)
+  assert(n.kind == nkStmtListExpr, renderTree(n))
   result = (newNodeI(nkStmtList, n.info), nil)
   result.s.sons = @[]
 
@@ -815,6 +815,22 @@ proc lowerStmtListExprs(ctx: var Ctx, n: PNode, needsSplit: var bool): PNode =
       n[1] = st
       result.add(n)
       result.add(ex)
+
+  of nkPragmaBlock:
+    var ns = false
+    for i in 0..<n.len:
+      n[i] = ctx.lowerStmtListExprs(n[i], ns)
+    if ns:
+      needsSplit = true
+      result = n
+      # If the body contains a yield statement, we need to split
+      if n[1].kind == nkStmtListExpr:
+        let (st, ex) = exprToStmtList(n[1])
+        result = newNodeI(nkStmtListExpr, n.info)
+        result.typ() = n.typ
+        n[1] = st
+        result.add(n)
+        result.add(ex)
 
   else:
     for i in 0..<n.len:
