@@ -522,6 +522,7 @@ proc formatValue*[T: SomeInteger](result: var string; value: T;
 proc formatFloat(
     result: var string, value: SomeFloat, fmode: FloatFormatMode,
     spec: StandardFormatSpecifier) =
+  bind `[]` # Avoid conflicting with user-defined `[]` operator
   var f = formatBiggestFloat(value, fmode, spec.precision)
   var sign = false
   if value >= 0.0:
