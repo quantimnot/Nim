@@ -336,6 +336,7 @@ proc `$`*(stackTraceEntries: seq[StackTraceEntry]): string =
     dec i
 
 proc injectStacktrace[T](future: Future[T]) =
+  bind `[]` # Avoid conflicting with user-defined `[]` operator
   when not defined(release):
     const header = "\nAsync traceback:\n"
 
