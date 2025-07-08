@@ -421,7 +421,7 @@ proc throws(tracked, n, orig: PNode) =
       tracked.add n
 
 proc getEbase*(g: ModuleGraph; info: TLineInfo): PType =
-  result = g.sysTypeFromName(info, "Exception")
+  result = g.sysTypeFromName(info, "Defect") # Use `Defect` for default exception type
 
 proc excType(g: ModuleGraph; n: PNode): PType =
   # reraise is like raising E_Base:
