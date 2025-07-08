@@ -125,7 +125,7 @@ type
     nskProc, nskFunc, nskMethod, nskIterator,
     nskConverter, nskMacro, nskTemplate, nskField,
     nskEnumField, nskForVar, nskLabel,
-    nskStub
+    nskStub, nskPackage
 
   TNimSymKinds* {.deprecated.} = set[NimSymKind]
 
@@ -1819,3 +1819,28 @@ proc extractDocCommentsAndRunnables*(n: NimNode): NimNode =
         result.add ni
       else: break
     else: break
+
+func getModule*(sym: NimNode): NimNode =
+  ## Return the owning module symbol.
+  ## Returns `sym` when `sym` is a module symbol.
+  ## Returns `nil` when `sym` is a package symbol.
+  case sym.symKind
+  of nskModule: return sym
+  of nskPackage: return nil
+  else:
+    var sym = sym
+    while sym.symKind != nskModule:
+      sym = sym.owner
+    return sym
+
+func getPackage*(sym: NimNode): NimNode =
+  ## Return the owning package symbol.
+  ## Returns `sym` when `sym` is a package symbol.
+  case sym.symKind
+  of nskPackage: return sym
+  of nskModule: return sym.owner
+  else:
+    var sym = sym
+    while sym.symKind != nskPackage:
+      sym = sym.owner
+    return sym

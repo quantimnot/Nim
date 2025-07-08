@@ -1925,8 +1925,10 @@ proc skipGenericOwner*(s: PSym): PSym =
   ## Generic instantiations are owned by their originating generic
   ## symbol. This proc skips such owners and goes straight to the owner
   ## of the generic itself (the module or the enclosing proc).
-  result = if s.kind == skModule:
-            s
+  result = if s.kind == skPackage:
+             s
+           elif s.kind == skModule:
+             s.owner
            elif s.kind in skProcKinds and sfFromGeneric in s.flags and s.owner.kind != skModule:
              s.owner.owner
            else:
