@@ -327,6 +327,7 @@ import std/strutils except format
 
 when defined(nimPreviewSlimSystem):
   import std/assertions
+  import std/objectdollar
 
 
 proc mkDigit(v: int, typ: char): string {.inline.} =
