@@ -170,6 +170,7 @@ proc add*[T](x: var seq[T]; y: sink T) {.magic: "AppendSeqElem", noSideEffect, n
     xu.p.data[oldLen] = y
 
 proc setLen[T](s: var seq[T], newlen: Natural) {.nodestroy.} =
+  mixin default # Permit binding to a user-defined `default` proc for `T`
   {.noSideEffect.}:
     if newlen < s.len:
       shrink(s, newlen)
