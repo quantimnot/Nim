@@ -565,7 +565,7 @@ proc d2i_X509*(b: string): PX509 =
   let i = cast[ptr ptr uint8](addr bb)
   let ret = d2i_X509(addr result, i, b.len.cint)
   if ret.isNil:
-    raise newException(Exception, "X.509 certificate decoding failed")
+    raise newException(ValueError, "X.509 certificate decoding failed")
 
 proc i2d_X509*(cert: PX509): string =
   ## encode `cert` to DER string
@@ -575,7 +575,7 @@ proc i2d_X509*(cert: PX509): string =
   let o = cast[ptr ptr uint8](addr q)
   let length = i2d_X509(cert, o)
   if length.int <= 0:
-    raise newException(Exception, "X.509 certificate encoding failed")
+    raise newException(ValueError, "X.509 certificate encoding failed")
 
 const
   useNimsAlloc = not defined(nimNoAllocForSSL) and not defined(gcDestructors)
