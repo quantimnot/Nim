@@ -6,15 +6,25 @@ when useLibC:
   import ansi_c
 
 proc nimCopyMem*(dest, source: pointer, size: Natural) {.nonReloadable, compilerproc, inline.} =
-  when useLibC:
-    c_memcpy(dest, source, cast[csize_t](size))
-  else:
-    let d = cast[ptr UncheckedArray[byte]](dest)
-    let s = cast[ptr UncheckedArray[byte]](source)
+  when nimvm:
+    var pd = dest
+    var ps = source
     var i = 0
     while i < size:
-      d[i] = s[i]
+      cast[ptr byte](pd)[] = cast[ptr byte](ps)[]
+      pd = cast[pointer](cast[int](pd) + 1)
+      ps = cast[pointer](cast[int](ps) + 1)
       inc i
+  else:
+    when useLibC:
+      c_memcpy(dest, source, cast[csize_t](size))
+    else:
+      let d = cast[ptr UncheckedArray[byte]](dest)
+      let s = cast[ptr UncheckedArray[byte]](source)
+      var i = 0
+      while i < size:
+        d[i] = s[i]
+        inc i
 
 proc nimSetMem*(a: pointer, v: cint, size: Natural) {.nonReloadable, inline.} =
   when useLibC:
