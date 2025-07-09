@@ -66,6 +66,26 @@
 ##   nim c -r test 'bug #*::' '::#*'
 ##   ```
 ##
+## Known Issues
+## ============
+##
+## Use `knownIssue` to mark tests that are expected to fail due to known bugs or limitations.
+## These tests will be marked as XFAIL when they fail as expected, or XPASS when they
+## unexpectedly pass (indicating the issue may be fixed).
+##
+##   ```nim
+##   knownIssue "division by zero", "Bug #1234 - needs proper error handling":
+##     let result = 10 / 0
+##     check result == Inf  # This will fail as expected -> XFAIL
+##
+##   knownIssue "unicode parsing", "Issue #5678 - parser doesn't handle unicode":
+##     let parsed = parseUnicode("🦄")
+##     check parsed.isValid  # If this passes -> XPASS (unexpected success)
+##   ```
+##
+## Known issue tests do not cause the program to exit with a failure code,
+## allowing CI systems to pass while still tracking the status of known problems.
+##
 ## Examples
 ## ========
 ##
@@ -93,6 +113,11 @@
 ##       let v = @[1, 2, 3]  # you can do initialization here
 ##       expect(IndexDefect):
 ##         discard v[4]
+##
+##     knownIssue "unicode handling", "Bug #1234 - parser fails on unicode":
+##       # This test is expected to fail due to a known issue
+##       let result = parseUnicode("🦄")
+##       check result.isValid
 ##
 ##     echo "suite teardown: run once after the tests"
 ##   ```
@@ -125,7 +150,9 @@ type
   TestStatus* = enum ## The status of a test when it is done.
     OK,
     FAILED,
-    SKIPPED
+    SKIPPED,
+    XFAIL,    ## Expected failure due to known issue
+    XPASS     ## Unexpected pass (known issue was fixed)
 
   OutputLevel* = enum ## The output verbosity of the tests.
     PRINT_ALL,        ## Print as much as possible.
@@ -139,6 +166,8 @@ type
     testName*: string
       ## Name of the test case
     status*: TestStatus
+    reason*: string
+      ## Reason for known issue (used with XFAIL/XPASS status)
 
   OutputFormatter* = ref object of RootObj
 
@@ -272,7 +301,7 @@ method testStarted*(formatter: ConsoleOutputFormatter, testName: string) =
   formatter.isInTest = true
 
 method failureOccurred*(formatter: ConsoleOutputFormatter,
-                        checkpoints: seq[string], stackTrace: string) =
+                        checkpoints: seq[string], stackTrace: string) {.gcsafe.} =
   if stackTrace.len > 0:
     echo stackTrace
   let prefix = if formatter.isInSuite: "    " else: ""
@@ -285,16 +314,19 @@ method testEnded*(formatter: ConsoleOutputFormatter, testResult: TestResult) =
   if formatter.outputLevel != OutputLevel.PRINT_NONE and
       (formatter.outputLevel == OutputLevel.PRINT_ALL or testResult.status == TestStatus.FAILED):
     let prefix = if testResult.suiteName.len > 0: "  " else: ""
+    let reasonSuffix = if testResult.reason.len > 0: " (" & testResult.reason & ")" else: ""
     template rawPrint() = echo(prefix, "[", $testResult.status, "] ",
-        testResult.testName)
+        testResult.testName, reasonSuffix)
     when useTerminal:
       if formatter.colorOutput:
         var color = case testResult.status
           of TestStatus.OK: fgGreen
           of TestStatus.FAILED: fgRed
           of TestStatus.SKIPPED: fgYellow
+          of TestStatus.XFAIL: fgCyan
+          of TestStatus.XPASS: fgMagenta
         styledEcho styleBright, color, prefix, "[", $testResult.status, "] ",
-            resetStyle, testResult.testName
+            resetStyle, testResult.testName, reasonSuffix
       else:
         rawPrint()
     else:
@@ -364,6 +396,12 @@ method testEnded*(formatter: JUnitOutputFormatter, testResult: TestResult) =
     discard
   of TestStatus.SKIPPED:
     formatter.stream.writeLine("<skipped />")
+  of TestStatus.XFAIL:
+    let reasonAttr = if testResult.reason.len > 0: " message=\"" & xmlEscape(testResult.reason) & "\"" else: ""
+    formatter.stream.writeLine("<skipped" & reasonAttr & " />")
+  of TestStatus.XPASS:
+    let reasonAttr = if testResult.reason.len > 0: " message=\"Unexpected pass: " & xmlEscape(testResult.reason) & "\"" else: " message=\"Unexpected pass\""
+    formatter.stream.writeLine("<error" & reasonAttr & ">Test was expected to fail but passed</error>")
   of TestStatus.FAILED:
     let failureMsg = if formatter.testStackTrace.len > 0 and
                         formatter.testErrors.len > 0:
@@ -553,7 +591,10 @@ template test*(name, body) {.dirty.} =
       when declared(testTeardownIMPLFlag):
         defer: testTeardownIMPL()
       {.push warning[BareExcept]:on.}
-      body
+      block:
+        # Wrapping in a `block` allows us to use `break` in the test body, so
+        # that we can skip the rest of the test.
+        body
       {.pop.}
 
     except Exception:
@@ -573,7 +614,79 @@ template test*(name, body) {.dirty.} =
       let testResult = TestResult(
         suiteName: when declared(testSuiteName): testSuiteName else: "",
         testName: name,
-        status: testStatusIMPL
+        status: testStatusIMPL,
+        reason: ""
+      )
+      testEnded(testResult)
+      checkpoints = @[]
+    {.pop.}
+
+template knownIssue*(name, thereason: untyped{nkStrLit|nkRStrLit|nkTripleStrLit}; body: untyped{nkStmtList}): untyped =
+  ## Define a test case that is expected to fail due to a known issue.
+  ## If the test unexpectedly passes, it will be marked as XPASS.
+  ## If it fails as expected, it will be marked as XFAIL.
+  ##
+  ##   ```nim
+  ##   knownIssue "division by zero handling", "Bug #1234 - needs proper error handling":
+  ##     let result = 10 / 0  # This will fail as expected
+  ##     check result == Inf
+  ##   ```
+  ##
+  ## The above code outputs:
+  ##
+  ##     [XFAIL] division by zero handling (Bug #1234 - needs proper error handling)
+  bind shouldRun, checkpoints, formatters, ensureInitialized, testEnded, exceptionTypeName, setProgramResult
+
+  ensureInitialized()
+
+  if shouldRun(when declared(testSuiteName): testSuiteName else: "", name):
+    checkpoints = @[]
+    var testStatusIMPL {.inject.} = TestStatus.OK
+    var knownIssueReason {.inject.} = thereason
+
+    for formatter in formatters:
+      formatter.testStarted(name)
+
+    {.push warning[BareExcept]:off.}
+    try:
+      when declared(testSetupIMPLFlag): testSetupIMPL()
+      when declared(testTeardownIMPLFlag):
+        defer: testTeardownIMPL()
+      {.push warning[BareExcept]:on.}
+      block:
+        # Wrapping in a `block` allows us to use `break` in the test body, so
+        # that we can skip the rest of the test.
+        body
+      {.pop.}
+
+      # If we reach here without any failures, check if fail() was called
+      # If fail() was called, testStatusIMPL would be XFAIL, so don't override it
+      if testStatusIMPL != TestStatus.XFAIL:
+        testStatusIMPL = TestStatus.XPASS
+
+    except Exception:
+      let e = getCurrentException()
+      let eTypeDesc = "[" & exceptionTypeName(e) & "]"
+      checkpoint("Unhandled exception: " & getCurrentExceptionMsg() & " " & eTypeDesc)
+      var stackTrace {.inject.} = e.getStackTrace()
+      # For known issues, we expect failure, so mark as XFAIL instead of FAILED
+      testStatusIMPL = TestStatus.XFAIL
+
+    except:
+      checkpoint("Unhandled exception: " & getCurrentExceptionMsg() & " [<foreign exception>]")
+      # For known issues, we expect failure, so mark as XFAIL instead of FAILED
+      testStatusIMPL = TestStatus.XFAIL
+
+    finally:
+      # XFAIL and XPASS should not cause program exit with code 1
+      # Only actual FAILED tests should do that
+      if testStatusIMPL == TestStatus.FAILED:
+        setProgramResult 1
+      let testResult = TestResult(
+        suiteName: when declared(testSuiteName): testSuiteName else: "",
+        testName: name,
+        status: testStatusIMPL,
+        reason: knownIssueReason
       )
       testEnded(testResult)
       checkpoints = @[]
@@ -608,18 +721,29 @@ template fail* =
   ## outputs "Checkpoint A" before quitting.
   bind ensureInitialized, setProgramResult
   when declared(testStatusIMPL):
-    testStatusIMPL = TestStatus.FAILED
+    when declared(knownIssueReason):
+      # In a known issue test, failure is expected (XFAIL)
+      testStatusIMPL = TestStatus.XFAIL
+    else:
+      # In a regular test, failure is unexpected (FAILED)
+      testStatusIMPL = TestStatus.FAILED
   else:
     setProgramResult 1
 
   ensureInitialized()
 
+  {.warning[BareExcept]:off.}
+
     # var stackTrace: string = nil
   for formatter in formatters:
-    when declared(stackTrace):
-      formatter.failureOccurred(checkpoints, stackTrace)
-    else:
-      formatter.failureOccurred(checkpoints, "")
+    try:
+      when declared(stackTrace):
+        formatter.failureOccurred(checkpoints, stackTrace)
+      else:
+        formatter.failureOccurred(checkpoints, "")
+    except Defect as e: raise e
+    except CatchableError as e: raise e
+    except Exception as e: raise (ref Defect)(e)
 
   if abortOnError: quit(1)
 
