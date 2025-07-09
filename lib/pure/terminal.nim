@@ -638,6 +638,7 @@ proc resetAttributes*(f: File) =
 
 type
   Style* = enum        ## Different styles for text output.
+    styleNone = 0,     ## no style
     styleBright = 1,   ## bright text
     styleDim,          ## dim text
     styleItalic,       ## italic (or reverse on terminals not supporting)
@@ -660,18 +661,24 @@ template ansiStyleCode*(style: static[Style]): string =
 
 proc setStyle*(f: File, style: set[Style]) =
   ## Sets the terminal style.
-  when defined(windows):
-    let h = conHandle(f)
-    var old = getAttributes(h) and (FOREGROUND_RGB or BACKGROUND_RGB)
-    var a = 0'i16
-    if styleBright in style: a = a or int16(FOREGROUND_INTENSITY)
-    if styleBlink in style: a = a or int16(BACKGROUND_INTENSITY)
-    if styleReverse in style: a = a or 0x4000'i16 # COMMON_LVB_REVERSE_VIDEO
-    if styleUnderscore in style: a = a or 0x8000'i16 # COMMON_LVB_UNDERSCORE
-    discard setConsoleTextAttribute(h, old or a)
+  ## NOTE: If the style set contains `styleNone`, the attributes are reset. This is
+  ## equivalent to `resetAttributes(f)`.
+  if styleNone in style:
+    # Reset all styles
+    resetAttributes(f)
   else:
-    for s in items(style):
-      f.write(ansiStyleCode(s))
+    when defined(windows):
+      let h = conHandle(f)
+      var old = getAttributes(h) and (FOREGROUND_RGB or BACKGROUND_RGB)
+      var a = 0'i16
+      if styleBright in style: a = a or int16(FOREGROUND_INTENSITY)
+      if styleBlink in style: a = a or int16(BACKGROUND_INTENSITY)
+      if styleReverse in style: a = a or 0x4000'i16 # COMMON_LVB_REVERSE_VIDEO
+      if styleUnderscore in style: a = a or 0x8000'i16 # COMMON_LVB_UNDERSCORE
+      discard setConsoleTextAttribute(h, old or a)
+    else:
+      for s in items(style):
+        f.write(ansiStyleCode(s))
 
 proc writeStyled*(txt: string, style: set[Style] = {styleBright}) =
   ## Writes the text `txt` in a given `style` to stdout.
