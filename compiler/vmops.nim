@@ -434,3 +434,10 @@ proc registerAdditionalOps*(c: PCtx) =
   registerCallback c, "stdlib.macros.scope", proc(a: VmArgs) =
     setResult(a, newSymNode(c.graph.owners[^1]))
 
+  registerCallback c, "stdlib.macros.isInitialized", proc(a: VmArgs) =
+    # Checks if a node has been fully initialized.
+    # See `macros/isInitialized`
+    let n = getNode(a, 0)
+    if n.kind != nkSym:
+      stackTrace2(c, "isInitialized() requires a symbol. '$#' is of kind '$#'" % [$n, $n.kind], n)
+    setResult(a, sfRequiresInit notin n.sym.flags)

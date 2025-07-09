@@ -1823,6 +1823,9 @@ proc extractDocCommentsAndRunnables*(n: NimNode): NimNode =
 func scope*: NimNode =
   ## Returns the current scope.
 
+func isInitialized*(n: NimNode): bool =
+  ## Returns whether a node is fully initialized.
+
 func getModule*(sym: NimNode): NimNode =
   ## Return the owning module symbol.
   ## Returns `sym` when `sym` is a module symbol.
