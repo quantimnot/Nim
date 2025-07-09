@@ -3,22 +3,33 @@ when defined(js):
 
   type
     ArrayBuffer* = ref object of JsRoot
-    Float64Array* = ref object of JsRoot
     Uint32Array* = ref object of JsRoot
     Uint8Array* = ref object of JsRoot
     BigUint64Array* = ref object of JsRoot
-
+  type 
+    Float64Array* = ref object of JsRoot
+      length* {.importjs.}: int
+      buffer* {.importjs.}: ArrayBuffer
+      byteOffset* {.importjs.}: int
+      byteLength* {.importjs.}: int
 
   func newArrayBuffer*(n: int): ArrayBuffer {.importjs: "new ArrayBuffer(#)".}
   func newFloat64Array*(buffer: ArrayBuffer): Float64Array {.importjs: "new Float64Array(#)".}
   func newUint32Array*(buffer: ArrayBuffer): Uint32Array {.importjs: "new Uint32Array(#)".}
   func newBigUint64Array*(buffer: ArrayBuffer): BigUint64Array {.importjs: "new BigUint64Array(#)".}
+  
+  proc dataView*(arr: Float64Array): (int, ptr UncheckedArray[float64]) =
+    ## Convert a TypedArray into a length + pointer pair for direct access
+    let length = arr.length
+    let data = cast[ptr UncheckedArray[float64]](cast[int](arr.buffer) + arr.byteOffset)
+    (length, data)
 
   func newUint8Array*(n: int): Uint8Array {.importjs: "new Uint8Array(#)".}
 
   func `[]`*(arr: Uint32Array, i: int): uint32 {.importjs: "#[#]".}
   func `[]`*(arr: Uint8Array, i: int): uint8 {.importjs: "#[#]".}
   func `[]`*(arr: BigUint64Array, i: int): JsBigInt {.importjs: "#[#]".}
+  func `[]`*(arr: Float64Array, i: int): float {.importjs: "#[#]".}
   func `[]=`*(arr: Float64Array, i: int, v: float) {.importjs: "#[#] = #".}
 
   proc jsTypeOf*[T](x: T): cstring {.importjs: "typeof(#)".} =
