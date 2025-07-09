@@ -970,7 +970,8 @@ proc semVarOrLet(c: PContext, n: PNode, symkind: TSymKind): PNode =
           let actualType = v.typ.skipTypes({tyGenericInst, tyAlias,
                                             tyUserTypeClassInst})
           if actualType.kind in {tyObject, tyDistinct} and
-            actualType.requiresInit:
+            actualType.requiresInit and
+            sfNoInit notin v.flags: # allows threadvars of .requiresInit types
             defaultConstructionError(c, v.typ, v.info)
           else:
             checkNilable(c, v)
