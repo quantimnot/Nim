@@ -1820,6 +1820,9 @@ proc extractDocCommentsAndRunnables*(n: NimNode): NimNode =
       else: break
     else: break
 
+func scope*: NimNode =
+  ## Returns the current scope.
+
 func getModule*(sym: NimNode): NimNode =
   ## Return the owning module symbol.
   ## Returns `sym` when `sym` is a module symbol.

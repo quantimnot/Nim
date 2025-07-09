@@ -430,3 +430,7 @@ proc registerAdditionalOps*(c: PCtx) =
     var res: string = ""
     storeAny(res, typ, regToNode(p[]), c.config)
     setResult(a, res)
+
+  registerCallback c, "stdlib.macros.scope", proc(a: VmArgs) =
+    setResult(a, newSymNode(c.graph.owners[^1]))
+
