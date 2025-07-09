@@ -255,8 +255,28 @@ macro enumLen*(T: typedesc[enum]): int =
   expectKind(enumTy, nnkEnumTy)
   result = newLit(enumTy.len - 1)
 
-macro genericParamsImpl(T: typedesc): untyped =
-  # auxiliary macro needed, can't do it directly in `genericParams`
+macro genericParams*(T: typedesc): untyped {.since: (1, 1).} =
+  ## Returns the tuple of generic parameters for the generic type `T`.
+  ##
+  ## **Note:** For the builtin array type, the index generic parameter will
+  ## **always** become a range type after it's bound to a variable.
+  runnableExamples:
+    type Foo[T1, T2] = object
+    doAssert genericParams(Foo[float, string]) is (float, string)
+    type Bar[N: static float, T] = object
+    doAssert genericParams(Bar[1.0, string]) is (StaticParam[1.0], string)
+    doAssert genericParams(Bar[1.0, string]).get(0).value == 1.0
+    doAssert genericParams(seq[Bar[2.0, string]]).get(0) is Bar[2.0, string]
+    var s: seq[Bar[3.0, string]]
+    doAssert genericParams(typeof(s)) is (Bar[3.0, string],)
+    doAssert genericParams(array[10, int]) is (StaticParam[10], int)
+    var a: array[10, int]
+    doAssert genericParams(typeof(a)) is (range[0..9], int)
+
+  # NOTE: This macro used to be called by a template, but that caused, or
+  # exacerbated, a bug in the compiler, which then caused other issues:
+  # - Fixes: https://github.com/nim-lang/Nim/issues/19334
+  # - Helps: https://github.com/nim-lang/Nim/issues/16600
   result = newNimNode(nnkTupleConstr)
   var impl = getTypeImpl(T)
   expectKind(impl, nnkBracketExpr)
@@ -277,6 +297,10 @@ macro genericParamsImpl(T: typedesc): untyped =
         of ntyTypeDesc:
           ret = ai
         of ntyStatic: raiseAssert "unreachable"
+        of ntyArray:
+          # Handle the special case of the static array param being rewritten by
+          # the compiler to a range type.
+          ret = newTree(nnkBracketExpr, @[bindSym"StaticParam", newLit(ai[2].intVal + 1)])
         else:
           # getType from a resolved symbol might return a typedesc symbol.
           # If so, use it directly instead of wrapping it in StaticParam.
@@ -309,31 +333,6 @@ macro genericParamsImpl(T: typedesc): untyped =
     else:
       error "wrong kind: " & $impl.kind, impl
 
-since (1, 1):
-  template genericParams*(T: typedesc): untyped =
-    ## Returns the tuple of generic parameters for the generic type `T`.
-    ##
-    ## **Note:** For the builtin array type, the index generic parameter will
-    ## **always** become a range type after it's bound to a variable.
-    runnableExamples:
-      type Foo[T1, T2] = object
-
-      doAssert genericParams(Foo[float, string]) is (float, string)
-
-      type Bar[N: static float, T] = object
-
-      doAssert genericParams(Bar[1.0, string]) is (StaticParam[1.0], string)
-      doAssert genericParams(Bar[1.0, string]).get(0).value == 1.0
-      doAssert genericParams(seq[Bar[2.0, string]]).get(0) is Bar[2.0, string]
-      var s: seq[Bar[3.0, string]]
-      doAssert genericParams(typeof(s)) is (Bar[3.0, string],)
-
-      doAssert genericParams(array[10, int]) is (StaticParam[10], int)
-      var a: array[10, int]
-      doAssert genericParams(typeof(a)) is (range[0..9], int)
-
-    type T2 = T
-    genericParamsImpl(T2)
 
 
 proc hasClosureImpl(n: NimNode): bool = raiseAssert "see compiler/vmops.nim"
