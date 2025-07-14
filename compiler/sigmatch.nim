@@ -1852,7 +1852,7 @@ proc typeRel(c: var TCandidate, f, aOrig: PType,
             minInheritance = min(minInheritance, c.inheritancePenalty)
           result = x
       c.inheritancePenalty = oldInheritancePenalty
-      if result >= isIntConv:
+      if result >= isConvertible:
         if minInheritance < maxInheritancePenalty:
           inc c.inheritancePenalty, minInheritance + ord(c.inheritancePenalty < 0)
         if result > isGeneric: result = isGeneric
