@@ -441,3 +441,4 @@ proc registerAdditionalOps*(c: PCtx) =
     if n.kind != nkSym:
       stackTrace2(c, "isInitialized() requires a symbol. '$#' is of kind '$#'" % [$n, $n.kind], n)
     setResult(a, sfRequiresInit notin n.sym.flags)
+

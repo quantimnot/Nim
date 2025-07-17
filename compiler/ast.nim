@@ -464,7 +464,7 @@ type
     mLow, mHigh, mSizeOf, mAlignOf, mOffsetOf, mTypeTrait,
     mIs, mOf, mAddr, mType, mTypeOf,
     mPlugin, mEcho, mShallowCopy, mSlurp, mStaticExec, mStatic,
-    mParseExprToAst, mParseStmtToAst, mExpandToAst, mQuoteAst,
+    mParseExprToAst, mParseStmtToAst, mExpandToAst, mQuoteAst, mToTypedAst,
     mInc, mDec, mOrd,
     mNew, mNewFinalize, mNewSeq, mNewSeqOfCap,
     mLengthOpenArray, mLengthStr, mLengthArray, mLengthSeq,

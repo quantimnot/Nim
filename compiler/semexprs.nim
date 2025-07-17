@@ -2310,6 +2310,20 @@ proc semExpandToAst(c: PContext, n: PNode, magicSym: PSym,
   else:
     result = semDirectOp(c, n, flags)
 
+proc semToTypedAst(c: PContext, n: PNode, magicSym: PSym,
+                   flags: TExprFlags = {}): PNode =
+  if n.len == 2:
+    # toTypedAst(code) - perform semantic analysis on the untyped AST
+    n[0] = newSymNode(magicSym, n.info)
+    # Analyze the argument to get a typed AST
+    let arg = n[1]
+    let typedArg = semExpr(c, arg, flags)
+    # Create the magic call with the typed argument
+    result = newTreeI(nkCall, n.info, n[0], typedArg)
+    result.typ = sysTypeFromName(c.graph, n.info, "NimNode")
+  else:
+    result = semDirectOp(c, n, flags)
+
 proc processQuotations(c: PContext; n: var PNode, op: string,
                        quotes: var seq[PNode],
                        ids: var seq[PNode]) =
@@ -2549,6 +2563,9 @@ proc semMagic(c: PContext, n: PNode, s: PSym, flags: TExprFlags; expectedType: P
   of mExpandToAst:
     markUsed(c, n.info, s)
     result = semExpandToAst(c, n, s, flags)
+  of mToTypedAst:
+    markUsed(c, n.info, s)
+    result = semToTypedAst(c, n, s, flags)
   of mQuoteAst:
     markUsed(c, n.info, s)
     result = semQuoteAst(c, n)

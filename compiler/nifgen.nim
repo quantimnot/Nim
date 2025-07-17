@@ -250,6 +250,7 @@ proc magicToNifTag(s: TMagic): (string, int) =
   of mParseStmtToAst: ("parsestmttoast", NoMagic)
   of mExpandToAst: ("expandtoast", NoMagic)
   of mQuoteAst: ("quoteast", NoMagic)
+  of mToTypedAst: ("totypedast", NoMagic)
   of mInc: ("inc", NoMagic)
   of mDec: ("dec", NoMagic)
   of mOrd: ("ord", NoMagic)

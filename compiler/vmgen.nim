@@ -1428,6 +1428,13 @@ proc genMagic(c: PCtx; n: PNode; dest: var TDest; flags: TGenFlags = {}, m: TMag
       # produces a value
     else:
       globalError(c.config, n.info, "expandToAst requires a call expression")
+  of mToTypedAst:
+    # toTypedAst is handled during semantic analysis, the typed AST is already
+    # in the argument. We just need to pass it through.
+    if n.len != 2:
+      globalError(c.config, n.info, "toTypedAst requires 1 argument")
+    if dest < 0: dest = c.getTemp(n.typ)
+    c.gen(n[1], dest)
   of mSizeOf:
     globalError(c.config, n.info, sizeOfLikeMsg("sizeof"))
   of mAlignOf:
@@ -1710,10 +1717,12 @@ proc importcSym(c: PCtx; info: TLineInfo; s: PSym) =
       s.position = c.globals.len
     else:
       localError(c.config, info,
-        "VM is not allowed to 'importc' without --experimental:compiletimeFFI")
+        "VM is not allowed to 'importc' '$1', at '$2', without --experimental:compiletimeFFI" %
+          [s.name.s, toFileLineCol(c.config,info)])
   else:
     localError(c.config, info,
-               "cannot 'importc' variable at compile time; " & s.name.s)
+               "cannot 'importc' variable '$1', at '$2'" %
+                [s.name.s, toFileLineCol(c.config,info)])
 
 proc getNullValue*(c: PCtx; typ: PType, info: TLineInfo; conf: ConfigRef): PNode
 

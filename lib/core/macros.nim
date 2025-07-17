@@ -601,6 +601,19 @@ proc getAst*(macroOrTemplate: untyped): NimNode {.magic: "ExpandToAst", noSideEf
   ##     var ast = getAst(BarTemplate())
   ##   ```
 
+proc toTypedAst*(code: NimNode): NimNode {.magic: "ToTypedAst", noSideEffect.} =
+  ## Converts an untyped AST to a typed AST by performing semantic analysis.
+  ## This allows macros to get type information for expressions that were
+  ## passed as untyped parameters.
+  ##
+  ## Example:
+  ##   ```nim
+  ##   macro analyzeExpr(expr: untyped): untyped =
+  ##     let typedExpr = toTypedAst(expr)
+  ##     echo typedExpr.getType.repr  # Now we can access type information
+  ##     result = expr
+  ##   ```
+
 proc quote*(bl: typed, op = "``"): NimNode {.magic: "QuoteAst", noSideEffect.} =
   ## Quasi-quoting operator.
   ## Accepts an expression or a block and returns the AST that represents it.
