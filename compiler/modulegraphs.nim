@@ -67,6 +67,7 @@ type
     Docgen2TexPass
     Docgen2JsonPass
     Docgen2Pass
+    ModuleDumpPass
 
   ModuleGraph* {.acyclic.} = ref object
     ifaces*: seq[Iface]  ## indexed by int32 fileIdx

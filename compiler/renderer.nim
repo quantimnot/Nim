@@ -25,7 +25,8 @@ type
   TRenderFlag* = enum
     renderNone, renderNoBody, renderNoComments, renderDocComments,
     renderNoPragmas, renderIds, renderNoProcDefs, renderSyms, renderRunnableExamples,
-    renderIr, renderNonExportedFields, renderExpandUsing, renderNoPostfix
+    renderIr, renderNonExportedFields, renderExpandUsing, renderNoPostfix,
+    renderModuleFullPaths, renderLineInfo
 
   TRenderFlags* = set[TRenderFlag]
   TRenderTok* = object
@@ -757,11 +758,15 @@ proc gstmts(g: var TSrcGen, n: PNode, c: TContext, doIndent=true) =
         gstmts(g, n[i], c, doIndent=false)
       else:
         gsub(g, n[i], fromStmtList = true)
+        if renderLineInfo in g.flags:
+          put(g, tkComment, "## " & toFileLineCol(g.config, n[i].info))
       gcoms(g)
     if doIndent: dedent(g)
   else:
     indentNL(g)
     gsub(g, n)
+    if renderLineInfo in g.flags:
+      put(g, tkComment, "## " & toFileLineCol(g.config, n.info))
     gcoms(g)
     dedent(g)
     optNL(g)
@@ -956,7 +961,20 @@ proc gident(g: var TSrcGen, n: PNode) =
 
   var t: TokType
   var s = atom(g, n)
-  if s.len > 0 and s[0] in lexer.SymChars:
+  
+  # Check if we should render module symbols with full paths  
+  var isQuotedPath = false
+  if renderModuleFullPaths in g.flags and g.config != nil and n.kind == nkSym and n.sym.kind == skModule:
+    let fileIdx = FileIndex(n.sym.position)
+    let fullPath = toFullPath(g.config, fileIdx)
+    if fullPath.len > 0 and fullPath != "???":
+      # Quote the path to make it valid Nim syntax
+      s = '"' & fullPath & '"'
+      isQuotedPath = true
+  
+  if isQuotedPath:
+    t = tkSymbol  # Treat quoted paths as symbols
+  elif s.len > 0 and s[0] in lexer.SymChars:
     if n.kind == nkIdent:
       if (n.ident.id < ord(tokKeywordLow) - ord(tkSymbol)) or
           (n.ident.id > ord(tokKeywordHigh) - ord(tkSymbol)):

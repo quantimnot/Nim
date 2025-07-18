@@ -168,6 +168,7 @@ type
     cmdBuildindex
     cmdGendepend
     cmdDump
+    cmdDumpModule
     cmdInteractive # start interactive session
     cmdNop
     cmdJsonscript # compile a .json build file

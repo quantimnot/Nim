@@ -188,6 +188,15 @@ proc commandCompileToJS(graph: ModuleGraph) =
     if optGenScript in conf.globalOptions:
       writeDepsFile(graph)
 
+proc commandDumpModule(graph: ModuleGraph) =
+  let conf = graph.config
+  wantMainModule(conf)
+  graph.config.setErrorMaxHighMaybe
+  initDefines(graph.config.symbols)
+  setPipeLinePass(graph, ModuleDumpPass)
+  compilePipelineSystemModule(graph)
+  discard graph.compilePipelineModule(fileInfoIdx(graph.config, graph.config.projectFull), {})
+
 proc commandInteractive(graph: ModuleGraph) =
   graph.config.setErrorMaxHighMaybe
   initDefines(graph.config.symbols)
@@ -528,6 +537,7 @@ proc mainCommand*(graph: ModuleGraph) =
     wantMainModule(conf)
     commandView(graph)
     #msgWriteln(conf, "Beware: Indentation tokens depend on the parser's state!")
+  of cmdDumpModule: commandDumpModule(graph)
   of cmdInteractive: commandInteractive(graph)
   of cmdNimscript:
     if conf.projectIsCmd or conf.projectIsStdin: discard

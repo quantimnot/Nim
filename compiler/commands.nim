@@ -492,6 +492,7 @@ proc parseCommand*(command: string): Command =
   of "buildindex": cmdBuildindex
   of "gendepend": cmdGendepend
   of "dump": cmdDump
+  of "dumpmodule": cmdDumpModule
   of "parse": cmdParse
   of "rod": cmdRod
   of "secret": cmdInteractive

@@ -3,6 +3,7 @@ import sem, cgen, modulegraphs, ast, llstream, parser, msgs,
        packages, syntaxes, depends, vm, pragmas, idents, lookups, wordrecg,
        liftdestructors, nifgen
 
+
 import pipelineutils
 
 import ../dist/checksums/src/checksums/sha1
@@ -10,12 +11,141 @@ import ../dist/checksums/src/checksums/sha1
 when not defined(leanCompiler):
   import jsgen, docgen2
 
-import std/[syncio, objectdollar, assertions, tables, strutils, strtabs]
-import renderer
+import std/[syncio, objectdollar, assertions, tables, strutils, strtabs, os]
+import renderer, astyaml
 import ic/replayer
 
 proc setPipeLinePass*(graph: ModuleGraph; pass: PipelinePass) =
   graph.pipelinePass = pass
+
+proc dumpModulePost(graph: ModuleGraph; module: PSym; finalNode: PNode) =
+  # This is called after destructor injection during CgenPass
+  let conf = graph.config
+  let dumpPostDestructor = getConfigVar(conf, "dump.postdestructor", "false").toLowerAscii == "true"
+
+  if not dumpPostDestructor:
+    return
+
+  let dumpFormat = getConfigVar(conf, "dump.format", "nim")
+  let dumpOutput = getConfigVar(conf, "dump.output", "stdout")
+
+  let nodeToUse = finalNode
+  let renderFlags = {renderIr, renderDocComments, renderLineInfo}
+
+  let content = case dumpFormat.toLowerAscii
+    of "nim", "nim-expanded":
+      renderTree(nodeToUse, renderFlags)
+    of "yaml":
+      treeToYaml(conf, nodeToUse)
+    of "ast":
+      "AST: " & $nodeToUse.kind & "\n" & $nodeToUse
+    else:
+      renderTree(nodeToUse, renderFlags)
+
+  # For stdout output, only dump the main module
+  if dumpOutput == "stdout":
+    if module.fileIdx == graph.config.projectMainIdx:
+      echo "=== Post-destructor dump for ", module.name.s, " ==="
+      echo content
+      echo "=== End post-destructor dump ==="
+    return
+
+  # For file output, dump all modules to nimcache directory
+  let nimcacheDir = getNimcacheDir(conf)
+  try:
+    createDir(nimcacheDir.string)
+  except OSError:
+    conf.quitOrRaise "cannot create nimcache directory: " & nimcacheDir.string
+
+  let moduleBaseName = extractFilename(toFullPath(conf, module.fileIdx))
+  let baseName = changeFileExt(moduleBaseName, "")
+  let filename = nimcacheDir.string / (baseName & ".postdestructor.dump.nim")
+
+  writeFile(filename, content)
+  echo "Post-destructor dump written to: ", filename
+
+proc dumpModule(graph: ModuleGraph; module: PSym; finalNode: PNode) =
+  let conf = graph.config
+  let dumpFormat = getConfigVar(conf, "dump.format", "nim")
+  let dumpOutput = getConfigVar(conf, "dump.output", "")
+  let actualOutput = if dumpOutput == "": "file" else: dumpOutput
+
+  # Get the module from the graph - transformed AST is stored there via appendToModule
+  let moduleFromGraph = graph.getModule(module.fileIdx)
+
+
+  # Always prefer moduleFromGraph.ast if available, as it contains the original source AST
+  # finalNode in CgenPass/JSgenPass may be empty or transformed
+  let nodeToUse = if moduleFromGraph != nil and moduleFromGraph.ast != nil and moduleFromGraph.ast.len > 0:
+    moduleFromGraph.ast
+  elif finalNode != nil and finalNode.len > 0:
+    finalNode
+  else:
+    finalNode
+
+  let dumpExpanded = getConfigVar(conf, "dump.expanded", "false").toLowerAscii == "true"
+  var renderFlags: TRenderFlags = if dumpExpanded:
+    {renderIr, renderDocComments, renderModuleFullPaths, renderLineInfo, renderNonExportedFields}
+  else:
+    {renderDocComments}
+
+  let content = case dumpFormat.toLowerAscii
+    of "nim":
+      renderTree(nodeToUse, renderFlags)
+    of "nim-expanded":
+      var expandedFlags: TRenderFlags = {renderIr, renderDocComments, renderModuleFullPaths, renderLineInfo, renderNonExportedFields}
+      renderTree(nodeToUse, expandedFlags)
+    of "yaml":
+      treeToYaml(conf, nodeToUse)
+    of "ast":
+      "AST: " & $nodeToUse.kind & "\n" & $nodeToUse
+    else:
+      renderTree(nodeToUse, renderFlags)
+
+  # For stdout output, only dump the main module to avoid cluttering
+  if actualOutput == "stdout":
+    if module.fileIdx == graph.config.projectMainIdx:
+      echo content
+    return
+
+  # For file output, dump all modules to nimcache directory
+  let nimcacheDir = getNimcacheDir(conf)
+  try:
+    createDir(nimcacheDir.string)
+  except OSError:
+    conf.quitOrRaise "cannot create nimcache directory: " & nimcacheDir.string
+
+  let moduleBaseName = extractFilename(toFullPath(conf, module.fileIdx))
+  let filename = if actualOutput == "file":
+    # Generate filename in nimcache: module_name.dump
+    let baseName = changeFileExt(moduleBaseName, "")
+    nimcacheDir.string / (baseName & ".dump.nim")
+  else:
+    # Use specified output with nimcache prefix for non-main modules
+    if module.fileIdx == graph.config.projectMainIdx:
+      actualOutput
+    else:
+      nimcacheDir.string / (extractFilename(actualOutput) & "." & changeFileExt(moduleBaseName, ""))
+
+  writeFile(filename, content)
+  echo "Module dump written to: ", filename
+
+proc shouldDumpModule*(conf: ConfigRef): bool =
+  ## Check if any dump configuration variables are set to enable inline dumping
+  ## during regular compilation commands
+  result = getConfigVar(conf, "dump.output", "") != "" or
+           getConfigVar(conf, "dump.format", "") != "" or
+           getConfigVar(conf, "dump.expanded", "false").toLowerAscii == "true" or
+           getConfigVar(conf, "dump.postdestructor", "false").toLowerAscii == "true"
+
+proc dumpMainModuleInline*(graph: ModuleGraph) =
+  ## Dump only the main module during regular compilation
+  ## Uses the same logic as the dedicated dumpmodule command but focuses on main module
+  let conf = graph.config
+  let mainModule = graph.getModule(conf.projectMainIdx)
+  if mainModule != nil and mainModule.ast != nil:
+    dumpModule(graph, mainModule, mainModule.ast)
+
 
 proc processPipeline(graph: ModuleGraph; semNode: PNode; bModule: PPassContext): PNode =
   case graph.pipelinePass
@@ -48,6 +178,8 @@ proc processPipeline(graph: ModuleGraph; semNode: PNode; bModule: PPassContext):
       result = nil
   of EvalPass, InterpreterPass:
     result = interpreterCode(bModule, semNode)
+  of ModuleDumpPass:
+    result = semNode
   of NonePass:
     raiseAssert "use setPipeLinePass to set a proper PipelinePass"
 
@@ -66,6 +198,20 @@ proc processImplicitImports*(graph: ModuleGraph; implicits: seq[string], nodeKin
       let semNode = semWithPContext(ctx, importStmt)
       if semNode == nil or processPipeline(graph, semNode, bModule) == nil:
         break
+      # Mark implicitly imported modules as used to prevent unused import warnings
+      if nodeKind == nkImportStmt:
+        # Find the imported module and mark it as used
+        var i = 0
+        while i < ctx.unusedImports.len:
+          let (importedSym, _) = ctx.unusedImports[i]
+          # The module string might be a full path, so we need to extract just the module name
+          let moduleName = module.splitFile.name
+          if importedSym.name.s == moduleName or importedSym.name.s == module:
+            # Mark the symbol as used and remove from unused imports list
+            incl(importedSym.flags, sfUsed)
+            ctx.unusedImports.del(i)
+            break
+          inc i
 
 proc prePass*(c: PContext; n: PNode) =
   for son in n:
@@ -137,6 +283,8 @@ proc processPipelineModule*(graph: ModuleGraph; module: PSym; idgen: IdGenerator
       nil
     of NifgenPass:
       setupNifgen(graph, module, idgen)
+    of ModuleDumpPass:
+      nil
     of NonePass:
       raiseAssert "use setPipeLinePass to set a proper PipelinePass"
 
@@ -181,6 +329,17 @@ proc processPipelineModule*(graph: ModuleGraph; module: PSym; idgen: IdGenerator
       if graph.pipelinePass != EvalPass:
         message(graph.config, sl.info, hintProcessingStmt, $idgen[])
       var semNode = semWithPContext(ctx, sl)
+
+      # Store the semantic AST for later dumping before it gets transformed by codegen
+      if shouldDumpModule(graph.config) and module.fileIdx == graph.config.projectMainIdx:
+        # Store the semNode in the module for later retrieval
+        let moduleFromGraph = graph.getModule(module.fileIdx)
+        if moduleFromGraph != nil:
+          # Append the semantic node to build up the complete AST
+          if moduleFromGraph.ast == nil:
+            moduleFromGraph.ast = newNodeI(nkStmtList, sl.info)
+          moduleFromGraph.ast.add(semNode)
+
       discard processPipeline(graph, semNode, bModule)
 
     closeParser(p)
@@ -200,9 +359,17 @@ proc processPipelineModule*(graph: ModuleGraph; module: PSym; idgen: IdGenerator
             createTypeBoundOps(graph, ctx, retTyp, disp.ast.info, idgen)
           genProcAux(m, disp)
         discard closePContext(graph, ctx, nil)
+    # Call post-destructor dump after all codegen actions
+    dumpModulePost(graph, module, finalNode)
+    # Add conditional module dumping for regular compilation
+    if shouldDumpModule(graph.config):
+      dumpModule(graph, module, finalNode)
   of JSgenPass:
     when not defined(leanCompiler):
       discard finalJSCodeGen(graph, bModule, finalNode)
+    # Add conditional module dumping for regular compilation
+    if shouldDumpModule(graph.config):
+      dumpModule(graph, module, finalNode)
   of EvalPass, InterpreterPass:
     discard interpreterCode(bModule, finalNode)
   of SemPass, GenDependPass:
@@ -215,6 +382,8 @@ proc processPipelineModule*(graph: ModuleGraph; module: PSym; idgen: IdGenerator
       discard closeJson(graph, bModule, finalNode)
   of NifgenPass:
     closeNif(graph, bModule, finalNode)
+  of ModuleDumpPass:
+    dumpModule(graph, module, finalNode)
   of NonePass:
     raiseAssert "use setPipeLinePass to set a proper PipelinePass"
 
