@@ -539,8 +539,35 @@ proc processDefineConst(c: PContext, n: PNode, sym: PSym, kind: TMagic) =
 proc processDefine(c: PContext, n: PNode, sym: PSym) =
   if sym != nil and sym.kind == skConst:
     processDefineConst(c, n, sym, mGenericDefine)
-  elif (n.kind in nkPragmaCallKinds and n.len == 2) and (n[1].kind == nkIdent):
-    defineSymbol(c.config.symbols, n[1].ident.s)
+  elif n.kind in nkPragmaCallKinds:
+    case n.len
+    of 2:
+      # {.define: symbol.}
+      if n[1].kind == nkIdent:
+        defineSymbol(c.config.symbols, n[1].ident.s)
+      elif n[1].kind in {nkStrLit, nkRStrLit, nkTripleStrLit}:
+        # {.define: "symbol".} - string literal for symbol name only
+        defineSymbol(c.config.symbols, n[1].strVal)
+      else:
+        invalidPragma(c, n)
+    of 3:
+      # {.define(symbol, value).} - call syntax with two arguments
+      if n[1].kind == nkIdent:
+        let symbol = n[1].ident.s
+        case n[2].kind
+        of nkStrLit, nkRStrLit, nkTripleStrLit:
+          defineSymbol(c.config.symbols, symbol, n[2].strVal)
+        of nkIntLit:
+          defineSymbol(c.config.symbols, symbol, $n[2].intVal)
+        of nkIdent:
+          # Handle identifiers like `true`, `false`
+          defineSymbol(c.config.symbols, symbol, n[2].ident.s)
+        else:
+          invalidPragma(c, n)
+      else:
+        invalidPragma(c, n)
+    else:
+      invalidPragma(c, n)
   else:
     invalidPragma(c, n)
 
