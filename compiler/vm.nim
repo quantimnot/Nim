@@ -659,12 +659,17 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
       let typ = regs[ra].node.typ
       let node2 = newNodeIT(nkIntLit, c.debug[pc], typ)
       case regs[rb].kind
-      of rkInt: node2.intVal = regs[rb].intVal
+      of rkInt:
+        node2.intVal = regs[rb].intVal
       of rkNode:
         if regs[rb].node.typ.kind notin PtrLikeKinds:
           stackTrace(c, tos, pc, "opcCastIntToPtr: regs[rb].node.typ: " & $regs[rb].node.typ.kind)
         node2.intVal = regs[rb].node.intVal
+      of rkNodeAddr:
+        # Handle address-to-pointer conversion for operations like addr(string[index])
+        node2.intVal = cast[int](regs[rb].nodeAddr)
       else: stackTrace(c, tos, pc, "opcCastIntToPtr: regs[rb].kind: " & $regs[rb].kind)
+      node2.flags.incl nfIsPtr
       regs[ra].node = node2
     of opcAsgnComplex:
       asgnComplex(regs[ra], regs[instr.regB])
