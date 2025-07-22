@@ -26,7 +26,10 @@ type
 
 proc copyNode(ctx: TemplCtx, a, b: PNode): PNode =
   result = copyNode(a)
-  if ctx.instLines: setInfoRecursive(result, b.info)
+  # Skip setInfoRecursive for quote-generated templates to preserve line info
+  let isQuoteGenerated = sfTemplateRedefinition in ctx.owner.flags and sfCallsite notin ctx.owner.flags
+  if ctx.instLines and not isQuoteGenerated: 
+    setInfoRecursive(result, b.info)
 
 proc evalTemplateAux(templ, actual: PNode, c: var TemplCtx, result: PNode) =
   template handleParam(param) =
@@ -218,7 +221,11 @@ proc evalTemplate*(n: PNode, tmpl, genSymOwner: PSym;
     result = copyNode(body)
     ctx.instLines = sfCallsite in tmpl.flags
     if ctx.instLines:
-      setInfoRecursive(result, n.info)
+      # Check if this is a quote-generated template
+      let isQuoteGenerated = sfTemplateRedefinition in tmpl.flags and sfCallsite notin tmpl.flags
+      if not isQuoteGenerated:
+        # For regular templates, use original behavior
+        setInfoRecursive(result, n.info)
     for i in 0..<body.safeLen:
       evalTemplateAux(body[i], args, ctx, result)
   result.flags.incl nfFromTemplate
