@@ -542,6 +542,11 @@ proc getFile(arg: NimNode): string {.magic: "NLineInfo", noSideEffect.}
 proc copyLineInfo*(arg: NimNode, info: NimNode) {.magic: "NLineInfo", noSideEffect.}
   ## Copy lineinfo from `info`.
 
+proc copyLineInfoRecursively*(dest: NimNode, src: NimNode) =
+  ## Copy line info from the root `src` node to the `dest` node and all its
+  ## children recursively. This means all nodes in `dest` will have the same line
+  ## info as the root `src` node.
+
 proc setLine(arg: NimNode, line: uint16) {.magic: "NLineInfo", noSideEffect.}
 proc setColumn(arg: NimNode, column: int16) {.magic: "NLineInfo", noSideEffect.}
 proc setFile(arg: NimNode, file: string) {.magic: "NLineInfo", noSideEffect.}

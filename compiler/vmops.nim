@@ -442,3 +442,7 @@ proc registerAdditionalOps*(c: PCtx) =
       stackTrace2(c, "isInitialized() requires a symbol. '$#' is of kind '$#'" % [$n, $n.kind], n)
     setResult(a, sfRequiresInit notin n.sym.flags)
 
+  registerCallback c, "stdlib.macros.copyLineInfoRecursively", proc(a: VmArgs) =
+    let n = getNode(a, 0)
+    let copyFrom = getNode(a, 1)
+    setInfoRecursive(n, copyFrom.info)
