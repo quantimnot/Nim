@@ -12,7 +12,7 @@
 
 import semmacrosanity
 import
-  std/[strutils, tables, intsets, parseutils],
+  std/[strutils, tables, intsets, parseutils, strformat],
   msgs, vmdef, vmgen, nimsets, types,
   parser, vmdeps, idents, trees, renderer, options, transf,
   gorgeimpl, lineinfos, btrees, macrocacheimpl,
@@ -29,6 +29,14 @@ from magicsys import getSysType
 
 const
   traceCode = defined(nimVMDebug)
+
+when defined(nimDebugUtils):
+  import debugutils
+  template dbg(msg: untyped) =
+    if isCompilerDebug():
+      debugEcho msg
+else:
+  template dbg(msg) = discard
 
 when hasFFI:
   import evalffi
@@ -94,7 +102,12 @@ when not defined(nimComputedGoto):
 
 proc ensureKind(n: var TFullReg, k: TRegisterKind) {.inline.} =
   if n.kind != k:
-    n = TFullReg(kind: k)
+    if n.kind == rkNodeAddr and k == rkInt:
+      # Preserve the address value when converting to int for cast operations
+      let addrVal = cast[BiggestInt](n.nodeAddr)
+      n = TFullReg(kind: rkInt, intVal: addrVal)
+    else:
+      n = TFullReg(kind: k)
 
 template ensureKind(k: untyped) {.dirty.} =
   ensureKind(regs[ra], k)
@@ -128,7 +141,40 @@ template move(a, b: untyped) {.dirty.} =
     system.shallowCopy(a, b)
     # XXX fix minor 'shallowCopy' overloading bug in compiler
 
+proc getVMTypeSize(c: PCtx, typ: PType): BiggestInt =
+  ## Calculate the size of a type for VM pointer arithmetic
+  case typ.kind
+  of tyChar, tyBool: result = 1
+  of tyInt8, tyUInt8: result = 1
+  of tyInt16, tyUInt16: result = 2
+  of tyInt32, tyUInt32, tyFloat32: result = 4
+  of tyInt64, tyUInt64, tyFloat64, tyInt, tyUInt, tyPointer: result = 8
+  of tyObject, tyTuple:
+    # Calculate size recursively for composite types
+    result = 0
+    if typ.n != nil:
+      for field in typ.n:
+        if field.kind == nkSym:
+          result += getVMTypeSize(c, field.sym.typ)
+  of tyArray:
+    let elemSize = getVMTypeSize(c, typ.elementType)
+    result = elemSize * toInt(lengthOrd(c.config, typ))
+  of tyUncheckedArray:
+    # UncheckedArray itself doesn't have a fixed size,
+    # but we return element size for indexing calculations
+    result = getVMTypeSize(c, typ.elementType)
+  else:
+    # Default to pointer size for unknown types
+    result = 8
+
 proc derefPtrToReg(address: BiggestInt, typ: PType, r: var TFullReg, isAssign: bool): bool =
+  dbg &"""
+  DEBUG derefPtrToReg:
+    address: {address}
+    typ.kind: {typ.kind}
+    isAssign: {isAssign}
+    WARNING: This function assumes address is a real memory pointer!
+  """
   # nim bug: `isAssign: static bool` doesn't work, giving odd compiler error
   template fun(field, typ, rkind) =
     if isAssign:
@@ -136,6 +182,7 @@ proc derefPtrToReg(address: BiggestInt, typ: PType, r: var TFullReg, isAssign: b
     else:
       r.ensureKind(rkind)
       let val = cast[ptr typ](address)[]
+      dbg "  dereferenced value: " & $val
       when typ is SomeInteger | char:
         r.field = BiggestInt(val)
       else:
@@ -523,20 +570,59 @@ const
   errFieldXNotFound = "node lacks field: "
 
 
-template maybeHandlePtr(node2: PNode, reg: TFullReg, isAssign2: bool): bool =
+template maybeHandlePtr(node2: PNode, reg: var TFullReg, isAssign2: bool): bool =
   let node = node2 # prevent double evaluation
+  when defined(nimDebugUtils):
+    if isCompilerDebug():
+      debugEcho "DEBUG maybeHandlePtr: node.kind = " & $node.kind
   if node.kind == nkNilLit:
     stackTrace(c, tos, pc, errNilAccess)
   let typ = node.typ
+  when defined(nimDebugUtils):
+    if isCompilerDebug():
+      debugEcho "DEBUG maybeHandlePtr: typ = " & (if typ == nil: "nil" else: $typ.kind)
+      debugEcho "DEBUG maybeHandlePtr: nfIsPtr in flags = " & $(nfIsPtr in node.flags)
   if nfIsPtr in node.flags or (typ != nil and typ.kind == tyPtr):
+    when defined(nimDebugUtils):
+      if isCompilerDebug():
+        debugEcho "DEBUG maybeHandlePtr: handling pointer case"
     assert node.kind == nkIntLit, $(node.kind)
     assert typ != nil
     let typ2 = if typ.kind == tyPtr: typ.elementType else: typ
-    if not derefPtrToReg(node.intVal, typ2, reg, isAssign = isAssign2):
+    when defined(nimDebugUtils):
+      if isCompilerDebug():
+        debugEcho "DEBUG maybeHandlePtr: element type = " & $typ2.kind
+
+    # Special handling for UncheckedArray
+    if typ2.kind == tyUncheckedArray:
+      when defined(nimDebugUtils):
+        if isCompilerDebug():
+          debugEcho "DEBUG maybeHandlePtr: UncheckedArray case - setting reg.node and reg.kind"
+          debugEcho "DEBUG maybeHandlePtr: Before assignment - reg.kind=" & $reg.kind
+      # For ptr UncheckedArray[T], treat as a pointer that can be indexed
+      # The indexing will be handled by opcLdArr/opcWrArr with special logic
+      # Use safe object variant assignment
+      reg = TFullReg(kind: rkNode, node: node)
+      when defined(nimDebugUtils):
+        if isCompilerDebug():
+          debugEcho "DEBUG maybeHandlePtr: After assignment - reg.kind=" & $reg.kind & ", reg.node.kind=" & $reg.node.kind
+      true
+    elif not derefPtrToReg(node.intVal, typ2, reg, isAssign = isAssign2):
+      when defined(nimDebugUtils):
+        if isCompilerDebug():
+          debugEcho "DEBUG maybeHandlePtr: derefPtrToReg failed"
       # tyObject not supported in this context
       stackTrace(c, tos, pc, "deref unsupported ptr type: " & $(typeToString(typ), typ.kind))
-    true
+      true
+    else:
+      when defined(nimDebugUtils):
+        if isCompilerDebug():
+          debugEcho "DEBUG maybeHandlePtr: derefPtrToReg succeeded"
+      true
   else:
+    when defined(nimDebugUtils):
+      if isCompilerDebug():
+        debugEcho "DEBUG maybeHandlePtr: not a pointer, returning false"
     false
 
 template takeAddress(reg, source) =
@@ -553,6 +639,7 @@ proc takeCharAddress(c: PCtx, src: PNode, index: BiggestInt, pc: int): TFullReg 
 
 
 proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
+  dbg &"DEBUG rawExecute: Starting execution at pc={start}"
   result = TFullReg(kind: rkNone)
   var pc = start
   var tos = tos
@@ -568,9 +655,12 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
     var regs: seq[TFullReg] # alias to tos.slots for performance
     updateRegsAlias
   #echo "NEW RUN ------------------------"
+  dbg "DEBUG rawExecute: Starting main execution loop"
   while true:
     #{.computedGoto.}
+    dbg &"DEBUG rawExecute: Fetching instruction at pc={pc}"
     let instr = c.code[pc]
+    dbg &"DEBUG rawExecute: Got instruction opcode={instr.opcode}"
     let ra = instr.regA
 
     when traceCode:
@@ -588,8 +678,11 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
       # other useful variables: c.loopIterations
       echo "$# [$#] $#" % [c.config$info, $instr.opcode, c.config.sourceLine(info)]
     c.profiler.enter(c, tos)
+    dbg &"DEBUG rawExecute: Executing opcode {instr.opcode} at pc={pc}"
     case instr.opcode
-    of opcEof: return regs[ra]
+    of opcEof: 
+      dbg &"DEBUG rawExecute: Reached opcEof, returning regs[{ra}].kind={regs[ra].kind}"
+      return regs[ra]
     of opcRet:
       let newPc = c.cleanUpOnReturn(tos)
       # Perform any cleanup action before returning
@@ -640,38 +733,54 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
 
     of opcCastPtrToInt: # RENAME opcCastPtrOrRefToInt
       decodeBImm(rkInt)
+      dbg &"DEBUG opcCastPtrToInt: imm={imm}, regs[rb].kind={regs[rb].kind}"
       case imm
       of 1: # PtrLikeKinds
         case regs[rb].kind
         of rkNode:
+          dbg &"  rkNode intVal={regs[rb].node.intVal}"
           regs[ra].intVal = cast[int](regs[rb].node.intVal)
         of rkNodeAddr:
-          regs[ra].intVal = cast[int](regs[rb].nodeAddr)
+          let nodeAddress = cast[int](regs[rb].nodeAddr)
+          dbg &"  rkNodeAddr={nodeAddress}"
+          regs[ra].intVal = nodeAddress
         of rkRegisterAddr:
-          regs[ra].intVal = cast[int](regs[rb].regAddr)
+          let regAddress = cast[int](regs[rb].regAddr)
+          dbg &"  rkRegisterAddr={regAddress}"
+          regs[ra].intVal = regAddress
         of rkInt:
+          dbg &"  rkInt value={regs[rb].intVal}"
           regs[ra].intVal = regs[rb].intVal
         else:
           stackTrace(c, tos, pc, "opcCastPtrToInt: got " & $regs[rb].kind)
       of 2: # tyRef
-        regs[ra].intVal = cast[int](regs[rb].node)
+        let refAddress = cast[int](regs[rb].node)
+        dbg &"  tyRef={refAddress}"
+        regs[ra].intVal = refAddress
       else: assert false, $imm
+      dbg &"  result={regs[ra].intVal}"
     of opcCastIntToPtr:
       let rb = instr.regB
       let typ = regs[ra].node.typ
       let node2 = newNodeIT(nkIntLit, c.debug[pc], typ)
+      dbg &"DEBUG opcCastIntToPtr: regs[rb].kind={regs[rb].kind}"
       case regs[rb].kind
       of rkInt:
+        dbg &"  rkInt value={regs[rb].intVal}"
         node2.intVal = regs[rb].intVal
       of rkNode:
         if regs[rb].node.typ.kind notin PtrLikeKinds:
           stackTrace(c, tos, pc, "opcCastIntToPtr: regs[rb].node.typ: " & $regs[rb].node.typ.kind)
+        dbg &"  rkNode intVal={regs[rb].node.intVal}"
         node2.intVal = regs[rb].node.intVal
       of rkNodeAddr:
         # Handle address-to-pointer conversion for operations like addr(string[index])
-        node2.intVal = cast[int](regs[rb].nodeAddr)
+        let nodeAddress = cast[int](regs[rb].nodeAddr)
+        dbg &"  rkNodeAddr converted to={nodeAddress}"
+        node2.intVal = nodeAddress
       else: stackTrace(c, tos, pc, "opcCastIntToPtr: regs[rb].kind: " & $regs[rb].kind)
       node2.flags.incl nfIsPtr
+      dbg &"  final pointer value={node2.intVal}"
       regs[ra].node = node2
     of opcAsgnComplex:
       asgnComplex(regs[ra], regs[instr.regB])
@@ -682,9 +791,11 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
     of opcNodeToReg:
       let ra = instr.regA
       let rb = instr.regB
+      dbg &"DEBUG opcNodeToReg: regs[rb].kind = {regs[rb].kind}"
       # opcLdDeref might already have loaded it into a register. XXX Let's hope
       # this is still correct this way:
       if regs[rb].kind != rkNode:
+        dbg &"DEBUG opcNodeToReg: copying non-rkNode register"
         regs[ra] = regs[rb]
       else:
         assert regs[rb].kind == rkNode
@@ -751,33 +862,120 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
         stackTrace(c, tos, pc, formatErrorIndexBound(regs[rc].intVal, high(int)))
       let idx = regs[rc].intVal.int
       let src = regs[rb].node
-      case src.kind
-      of nkTupleConstr: # refer to `of opcSlice`
-        let
-          left = src[1].intVal
-          right = src[2].intVal
-          realIndex = left + idx
-        if idx in 0..(right - left):
-          case src[0].kind
-          of nkStrKinds:
-            regs[ra].node =  newIntNode(nkCharLit, ord src[0].strVal[int realIndex])
-          of nkBracket:
-            regs[ra].node = src[0][int realIndex]
-          else:
-            stackTrace(c, tos, pc, "opcLdArr internal error")
-        else:
-          stackTrace(c, tos, pc, formatErrorIndexBound(idx, int right))
-
-      of nkStrLit..nkTripleStrLit:
-        if idx <% src.strVal.len:
-          regs[ra].node = newNodeI(nkCharLit, c.debug[pc])
-          regs[ra].node.intVal = src.strVal[idx].ord
-        else:
-          stackTrace(c, tos, pc, formatErrorIndexBound(idx, src.strVal.len-1))
-      elif src.kind notin {nkEmpty..nkFloat128Lit} and idx <% src.len:
-        regs[ra].node = src[idx]
+      dbg &"DEBUG opcLdArr: idx={idx}, src.kind={src.kind}"
+      if src.typ != nil:
+        dbg &"  src.typ.kind={src.typ.kind}"
+        if src.typ.kind == tyPtr and src.typ.elementType != nil:
+          dbg &"  src.typ.elementType.kind={src.typ.elementType.kind}"
+      
+      # Debug the actual node content
+      case src.kind:
+      of nkIntLit:
+        dbg &"  src.intVal (address)={src.intVal}"
+      of nkBracket:
+        dbg &"  src is nkBracket with {src.len} elements"
+        if src.len > 0:
+          dbg &"  src[0].kind={src[0].kind}"
       else:
-        stackTrace(c, tos, pc, formatErrorIndexBound(idx, src.safeLen-1))
+        dbg &"  src.kind={src.kind} (unexpected for UncheckedArray)"
+
+      # Special handling for ptr UncheckedArray[T] indexing
+      # Only proceed if we have a proper pointer node (nkIntLit with address)
+      let isUncheckedArrayPtr = (src.typ != nil and src.typ.kind == tyPtr and
+                                src.typ.elementType != nil and src.typ.elementType.kind == tyUncheckedArray)
+      
+      dbg &"  isUncheckedArrayPtr={isUncheckedArrayPtr}, src.kind={src.kind}"
+      
+      if isUncheckedArrayPtr and src.kind == nkIntLit:
+        let elemType = src.typ.elementType.elementType
+        let firstElemAddr = src.intVal  # This points to element 0 of the array
+        
+        dbg &"  UncheckedArray deref: firstElemAddr={firstElemAddr}, idx={idx}"
+        
+        # For VM UncheckedArray access, we need to find the parent array from element 0
+        # and then access the correct index
+        try:
+          let firstElemPtr = cast[ptr PNode](firstElemAddr)
+          let firstElem = firstElemPtr[]
+          
+          if firstElem == nil:
+            stackTrace(c, tos, pc, &"UncheckedArray base element points to nil")
+          
+          # Find the parent array by going up from the first element
+          # In the VM context, we need to find the nkBracket array that contains this element
+          var parentArray: PNode = nil
+          
+          # For VM UncheckedArray, we need to traverse up to find the parent
+          # This is a bit complex, so let's use a different approach
+          # We'll try to access the element at the specific index by calculating from element 0
+          
+          if idx == 0:
+            # Direct access to element 0
+            dbg &"  Direct access to element 0"
+            ensureKind(rkNode)
+            regs[ra].node = firstElem
+            dbg &"  Successfully read UncheckedArray[0] with value={firstElem.intVal}"
+          else:
+            # For other indices, we need to calculate the offset in VM address space
+            # This is tricky because VM addresses point to AST nodes, not consecutive memory
+            # Let's try pointer arithmetic within the AST node structure
+            let targetAddr = firstElemAddr + BiggestInt(idx) * sizeof(PNode)
+            dbg &"  Calculated targetAddr for idx {idx}: {targetAddr}"
+            
+            let nodePtr = cast[ptr PNode](targetAddr)
+            let node = nodePtr[]
+            
+            if node == nil:
+              stackTrace(c, tos, pc, &"UncheckedArray[{idx}] address points to nil")
+            else:
+              dbg &"  Found target node: kind={node.kind}, intVal={node.intVal}"
+              ensureKind(rkNode)
+              regs[ra].node = node
+              dbg &"  Successfully read UncheckedArray[{idx}] with value={node.intVal}"
+        except CatchableError as e:
+          stackTrace(c, tos, pc, &"UncheckedArray[{idx}] access failed: {e.msg}")
+      elif isUncheckedArrayPtr and src.kind != nkIntLit:
+        dbg &"  UncheckedArray cast produced {src.kind} instead of nkIntLit - falling back to normal array ops"
+        # Fall back to normal array operations when cast doesn't work properly
+        case src.kind
+        of nkBracket:
+          # Handle nkBracket case - this is a common fallback for cast operations
+          if idx <% src.len:
+            ensureKind(rkNode)
+            regs[ra].node = src[idx]
+            dbg &"  Fallback: Successfully read element [{idx}] from nkBracket"
+          else:
+            stackTrace(c, tos, pc, formatErrorIndexBound(idx, src.len-1))
+        else:
+          stackTrace(c, tos, pc, &"UncheckedArray fallback: unsupported node kind {src.kind}")
+      else:
+        dbg &"  Not an UncheckedArray operation, proceeding with normal array logic"
+        case src.kind
+        of nkTupleConstr: # refer to `of opcSlice`
+          let
+            left = src[1].intVal
+            right = src[2].intVal
+            realIndex = left + idx
+          if idx in 0..(right - left):
+            case src[0].kind
+            of nkStrKinds:
+              regs[ra].node =  newIntNode(nkCharLit, ord src[0].strVal[int realIndex])
+            of nkBracket:
+              regs[ra].node = src[0][int realIndex]
+            else:
+              stackTrace(c, tos, pc, "opcLdArr internal error")
+          else:
+            stackTrace(c, tos, pc, formatErrorIndexBound(idx, int right))
+        of nkStrLit..nkTripleStrLit:
+          if idx <% src.strVal.len:
+            regs[ra].node = newNodeI(nkCharLit, c.debug[pc])
+            regs[ra].node.intVal = src.strVal[idx].ord
+          else:
+            stackTrace(c, tos, pc, formatErrorIndexBound(idx, src.strVal.len-1))
+        elif src.kind notin {nkEmpty..nkFloat128Lit} and idx <% src.len:
+          regs[ra].node = src[idx]
+        else:
+          stackTrace(c, tos, pc, formatErrorIndexBound(idx, src.safeLen-1))
     of opcLdArrAddr:
       # a = addr(b[c])
       decodeBC(rkNodeAddr)
@@ -785,29 +983,79 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
         stackTrace(c, tos, pc, formatErrorIndexBound(regs[rc].intVal, high(int)))
       let idx = regs[rc].intVal.int
       let src = if regs[rb].kind == rkNode: regs[rb].node else: regs[rb].nodeAddr[]
-      case src.kind
-      of nkTupleConstr:
-        let
-          left = src[1].intVal
-          right = src[2].intVal
-          realIndex = left + idx
-        if idx in 0..(right - left): # Refer to `opcSlice`
-          case src[0].kind
-          of nkStrKinds:
-            regs[ra] = takeCharAddress(c, src[0], realIndex, pc)
-          of nkBracket:
-            takeAddress regs[ra], src.sons[0].sons[realIndex]
-          else:
-            stackTrace(c, tos, pc, "opcLdArrAddr internal error")
-        else:
-          stackTrace(c, tos, pc, formatErrorIndexBound(idx, int right))
+      
+      # Debug opcLdArrAddr in detail
+      dbg &"DEBUG opcLdArrAddr: idx={idx}, src.kind={src.kind}"
+      if src.typ != nil:
+        dbg &"  src.typ.kind={src.typ.kind}"
+        if src.typ.kind == tyPtr and src.typ.elementType != nil:
+          dbg &"  src.typ.elementType.kind={src.typ.elementType.kind}"
       else:
-        if src.kind notin {nkEmpty..nkTripleStrLit} and idx <% src.len:
-          takeAddress regs[ra], src.sons[idx]
-        elif src.kind in nkStrKinds and idx <% src.strVal.len:
-          regs[ra] = takeCharAddress(c, src, idx, pc)
+        dbg &"  src.typ is nil"
+
+      # Special handling for ptr UncheckedArray[T] address calculation
+      if src.typ != nil and src.typ.kind == tyPtr and
+         src.typ.elementType != nil and src.typ.elementType.kind == tyUncheckedArray and
+         src.kind == nkIntLit:
+        dbg &"DEBUG opcLdArrAddr UncheckedArray case: src.intVal (base address)={src.intVal}"
+        dbg &"  idx={idx}"
+        
+        let elemType = src.typ.elementType.elementType
+        let baseAddr = src.intVal
+        let elemSize = getVMTypeSize(c, elemType)
+        dbg &"  elemSize={elemSize}"
+        
+        # PROPER APPROACH: Calculate address for any index
+        dbg &"  Creating address for UncheckedArray element [{idx}]"
+        
+        # Calculate the target address: baseAddr + (idx * elemSize)
+        let targetAddr = baseAddr + BiggestInt(idx) * elemSize
+        dbg &"  targetAddr = {baseAddr} + {idx} * {elemSize} = {targetAddr}"
+        
+        # Create pointer node for the target address
+        let ptrType = newType(tyPtr, c.idgen, c.module.owner, elemType)
+        let elemPtr = newNodeIT(nkIntLit, c.debug[pc], ptrType)
+        elemPtr.intVal = targetAddr
+        elemPtr.flags.incl nfIsPtr
+
+        ensureKind(rkNodeAddr)
+        regs[ra].nodeAddr = elemPtr.addr
+      else:
+        case src.kind
+        of nkTupleConstr:
+          let
+            left = src[1].intVal
+            right = src[2].intVal
+            realIndex = left + idx
+          if idx in 0..(right - left): # Refer to `opcSlice`
+            case src[0].kind
+            of nkStrKinds:
+              regs[ra] = takeCharAddress(c, src[0], realIndex, pc)
+            of nkBracket:
+              takeAddress regs[ra], src.sons[0].sons[realIndex]
+            else:
+              stackTrace(c, tos, pc, "opcLdArrAddr internal error")
+          else:
+            stackTrace(c, tos, pc, formatErrorIndexBound(idx, int right))
         else:
-          stackTrace(c, tos, pc, formatErrorIndexBound(idx, src.safeLen-1))
+          dbg &"DEBUG normal array address: src.kind={src.kind}, idx={idx}"
+          block:
+            template len: untyped =
+              if src.kind notin {nkEmpty..nkTripleStrLit}: src.len else: -1
+            dbg &"  src.len={len}"
+          if src.kind notin {nkEmpty..nkTripleStrLit} and idx <% src.len:
+            dbg &"  taking address of src.sons[{idx}]"
+            dbg &"  src.sons[{idx}].kind={src.sons[idx].kind}"
+            block:
+              template val: untyped =
+                if src.sons[idx].kind == nkIntLit: src.sons[idx].intVal else: 0
+              dbg &"  src.sons[{idx}].intVal={val}"
+            takeAddress regs[ra], src.sons[idx]
+            dbg &"  result nodeAddr={cast[int](regs[ra].nodeAddr)}"
+          elif src.kind in nkStrKinds and idx <% src.strVal.len:
+            regs[ra] = takeCharAddress(c, src, idx, pc)
+          else:
+            stackTrace(c, tos, pc, formatErrorIndexBound(idx, src.safeLen-1))
     of opcLdStrIdx:
       decodeBC(rkInt)
       let idx = regs[rc].intVal.int
@@ -833,42 +1081,96 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
       let idx = regs[rb].intVal.int
       assert regs[ra].kind == rkNode
       let arr = regs[ra].node
-      case arr.kind
-      of nkTupleConstr: # refer to `opcSlice`
-        let
-          src = arr[0]
-          left = arr[1].intVal
-          right = arr[2].intVal
-          realIndex = left + idx
-        if idx in 0..(right - left):
-          case src.kind
-          of nkStrKinds:
-            src.strVal[int(realIndex)] = char(regs[rc].intVal)
-          of nkBracket:
-            if regs[rc].kind == rkInt:
-              src[int(realIndex)] = newIntNode(nkIntLit, regs[rc].intVal)
+
+      # Special handling for ptr UncheckedArray[T] writing
+      if arr.typ != nil and arr.typ.kind == tyPtr and
+         arr.typ.elementType != nil and arr.typ.elementType.kind == tyUncheckedArray and
+         arr.kind == nkIntLit:
+        dbg &"DEBUG opcWrArr UncheckedArray: idx={idx}, baseAddr={arr.intVal}"
+        let elemType = arr.typ.elementType.elementType
+        let firstElemAddr = arr.intVal
+        
+        dbg &"  UncheckedArray write: firstElemAddr={firstElemAddr}, idx={idx}"
+        
+        # Calculate the target address for the write operation
+        try:
+          if idx == 0:
+            # Direct write to element 0
+            dbg &"  Direct write to element 0"
+            let firstElemPtr = cast[ptr PNode](firstElemAddr)
+            let targetNode = firstElemPtr[]
+            
+            if targetNode != nil and targetNode.kind in {nkIntLit, nkUIntLit}:
+              # Get the value to write from the register
+              let writeValue = case regs[rc].kind
+                of rkInt: regs[rc].intVal
+                of rkNode: regs[rc].node.intVal
+                else: 0
+              
+              dbg &"  Writing value {writeValue} to node (from register kind {regs[rc].kind})"
+              targetNode.intVal = writeValue
+              dbg &"  Successfully wrote to UncheckedArray[0]"
             else:
-              assert regs[rc].kind == rkNode
-              src[int(realIndex)] = regs[rc].node
+              stackTrace(c, tos, pc, &"UncheckedArray[0] write: target node is nil or wrong type")
           else:
-            stackTrace(c, tos, pc, "opcWrArr internal error")
-        else:
-          stackTrace(c, tos, pc, formatErrorIndexBound(idx, int right))
-      of {nkStrLit..nkTripleStrLit}:
-        if idx <% arr.strVal.len:
-          arr.strVal[idx] = chr(regs[rc].intVal)
-        else:
-          stackTrace(c, tos, pc, formatErrorIndexBound(idx, arr.strVal.len-1))
-      elif idx <% arr.len:
-        writeField(arr[idx], regs[rc])
+            # Write to other indices using pointer arithmetic
+            let targetAddr = firstElemAddr + BiggestInt(idx) * sizeof(PNode)
+            dbg &"  Calculated write targetAddr for idx {idx}: {targetAddr}"
+            
+            let nodePtr = cast[ptr PNode](targetAddr)
+            let node = nodePtr[]
+            
+            if node != nil and node.kind in {nkIntLit, nkUIntLit}:
+              # Get the value to write from the register
+              let writeValue = case regs[rc].kind
+                of rkInt: regs[rc].intVal
+                of rkNode: regs[rc].node.intVal
+                else: 0
+              
+              dbg &"  Writing value {writeValue} to node at idx {idx} (from register kind {regs[rc].kind})"
+              node.intVal = writeValue
+              dbg &"  Successfully wrote to UncheckedArray[{idx}]"
+            else:
+              stackTrace(c, tos, pc, &"UncheckedArray[{idx}] write: target node is nil or wrong type")
+        except CatchableError as e:
+          stackTrace(c, tos, pc, &"UncheckedArray[{idx}] write failed: {e.msg}")
       else:
-        stackTrace(c, tos, pc, formatErrorIndexBound(idx, arr.safeLen-1))
+        case arr.kind
+        of nkTupleConstr: # refer to `opcSlice`
+          let
+            src = arr[0]
+            left = arr[1].intVal
+            right = arr[2].intVal
+            realIndex = left + idx
+          if idx in 0..(right - left):
+            case src.kind
+            of nkStrKinds:
+              src.strVal[int(realIndex)] = char(regs[rc].intVal)
+            of nkBracket:
+              if regs[rc].kind == rkInt:
+                src[int(realIndex)] = newIntNode(nkIntLit, regs[rc].intVal)
+              else:
+                assert regs[rc].kind == rkNode
+                src[int(realIndex)] = regs[rc].node
+            else:
+              stackTrace(c, tos, pc, "opcWrArr internal error")
+          else:
+            stackTrace(c, tos, pc, formatErrorIndexBound(idx, int right))
+        of {nkStrLit..nkTripleStrLit}:
+          if idx <% arr.strVal.len:
+            arr.strVal[idx] = chr(regs[rc].intVal)
+          else:
+            stackTrace(c, tos, pc, formatErrorIndexBound(idx, arr.strVal.len-1))
+        elif idx <% arr.len:
+          writeField(arr[idx], regs[rc])
+        else:
+          stackTrace(c, tos, pc, formatErrorIndexBound(idx, arr.safeLen-1))
     of opcLdObj:
       # a = b.c
       decodeBC(rkNode)
-      if rb >= regs.len or regs[rb].kind == rkNone or 
+      if rb >= regs.len or regs[rb].kind == rkNone or
         (regs[rb].kind == rkNode and regs[rb].node == nil) or
-        (regs[rb].kind == rkNodeAddr and regs[rb].nodeAddr[] == nil): 
+        (regs[rb].kind == rkNodeAddr and regs[rb].nodeAddr[] == nil):
         stackTrace(c, tos, pc, errNilAccess)
       else:
         let src = if regs[rb].kind == rkNode: regs[rb].node else: regs[rb].nodeAddr[]
@@ -942,20 +1244,42 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
       # a = b[]
       let ra = instr.regA
       let rb = instr.regB
+      dbg &"DEBUG opcLdDeref: regs[rb].kind = {regs[rb].kind}"
+      if regs[rb].kind == rkNode:
+        dbg &"DEBUG opcLdDeref rkNode: node.kind = {regs[rb].node.kind}"
+        if regs[rb].node.typ != nil:
+          dbg &"DEBUG opcLdDeref rkNode: node.typ.kind = {regs[rb].node.typ.kind}"
+        else:
+          dbg &"DEBUG opcLdDeref rkNode: node.typ = nil"
+        dbg &"DEBUG opcLdDeref rkNode: node.flags = {regs[rb].node.flags}"
+        if nfIsPtr in regs[rb].node.flags:
+          dbg &"DEBUG opcLdDeref rkNode: nfIsPtr flag is set"
+        else:
+          dbg &"DEBUG opcLdDeref rkNode: nfIsPtr flag is NOT set"
+        if regs[rb].node.kind == nkIntLit:
+          dbg &"DEBUG opcLdDeref rkNode: intVal = {regs[rb].node.intVal}"
       case regs[rb].kind
       of rkNodeAddr:
+        dbg &"DEBUG opcLdDeref: converting rkNodeAddr to rkNode (DEREFERENCE)"
         ensureKind(rkNode)
         regs[ra].node = regs[rb].nodeAddr[]
       of rkRegisterAddr:
         ensureKind(regs[rb].regAddr.kind)
         regs[ra] = regs[rb].regAddr[]
       of rkNode:
+        dbg &"DEBUG opcLdDeref: handling rkNode case"
         if regs[rb].node.kind == nkRefTy:
+          dbg &"DEBUG opcLdDeref: nkRefTy case"
           regs[ra].node = regs[rb].node[0]
         elif not maybeHandlePtr(regs[rb].node, regs[ra], false):
+          dbg &"DEBUG opcLdDeref: maybeHandlePtr returned false, using fallback"
           ## e.g.: typ.kind = tyObject
           ensureKind(rkNode)
           regs[ra].node = regs[rb].node
+        else:
+          dbg &"DEBUG opcLdDeref: maybeHandlePtr returned true, regs[ra].kind={regs[ra].kind}"
+          if regs[ra].kind == rkNode and regs[ra].node != nil:
+            dbg &"DEBUG opcLdDeref: result node.kind={regs[ra].node.kind}"
       else:
         stackTrace(c, tos, pc, errNilAccess & " kind: " & $regs[rb].kind)
     of opcWrDeref:
@@ -2328,7 +2652,7 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
       regs[ra].node.strVal = typ.typeToString(preferExported)
 
     c.profiler.leave(c)
-
+    dbg &"DEBUG rawExecute: About to complete execution, result.kind={result.kind}"
     inc pc
 
 proc execute(c: PCtx, start: int): PNode =
@@ -2452,12 +2776,19 @@ proc evalConstExprAux(module: PSym; idgen: IdGenerator;
   if c.code[start].opcode == opcEof: return newNodeI(nkEmpty, n.info)
   assert c.code[start].opcode != opcEof
   when debugEchoCode: c.echoCode start
+  dbg &"DEBUG evalConstExprAux: Starting VM execution, start={start}"
   var tos = PStackFrame(prc: prc, comesFrom: 0, next: nil)
   newSeq(tos.slots, c.prc.regInfo.len)
+  dbg &"DEBUG evalConstExprAux: Created stack frame with {c.prc.regInfo.len} registers"
   #for i in 0..<c.prc.regInfo.len: tos.slots[i] = newNode(nkEmpty)
-  result = rawExecute(c, start, tos).regToNode
+  dbg "DEBUG evalConstExprAux: Calling rawExecute"
+  let vmResult = rawExecute(c, start, tos)
+  dbg &"DEBUG evalConstExprAux: rawExecute completed, vmResult.kind={vmResult.kind}"
+  result = vmResult.regToNode
+  dbg &"DEBUG evalConstExprAux: Converted to node, result.kind={result.kind}"
   if result.info.col < 0: result.info = n.info
   c.mode = oldMode
+  dbg "DEBUG evalConstExprAux: Completed successfully"
 
 proc evalConstExpr*(module: PSym; idgen: IdGenerator; g: ModuleGraph; e: PNode): PNode =
   result = evalConstExprAux(module, idgen, g, nil, e, emConst)
