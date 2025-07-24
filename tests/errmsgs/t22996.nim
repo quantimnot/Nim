@@ -1,5 +1,5 @@
 discard """
-  errormsg: "invalid type: 'typedesc[string]' for const"
+  errormsg: "invalid type: 'typedesc[string]' [1] for const [2]"
 """
 
 # bug #22996

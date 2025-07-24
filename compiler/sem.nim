@@ -272,22 +272,37 @@ proc semIdentVis(c: PContext, kind: TSymKind, n: PNode,
 proc semIdentWithPragma(c: PContext, kind: TSymKind, n: PNode,
                         allowed: TSymFlags, fromTopLevel = false): PSym
 
-proc typeAllowedCheck(c: PContext; info: TLineInfo; typ: PType; kind: TSymKind;
+proc typeAllowedCheck(c: PContext; lhsInfo, info: TLineInfo; typ: PType; kind: TSymKind;
                       flags: TTypeAllowedFlags = {}) =
   let t = typeAllowed(typ, kind, c, flags)
   if t != nil:
     var err: string
+    const showLineInfo = true
+    when showLineInfo:
+      let lhsLineInfo = toFileLineCol(c.config, lhsInfo)
+      let lineInfo = toFileLineCol(c.config, info)
     if t == typ:
-      err = "invalid type: '$1' for $2" % [typeToString(typ), toHumanStr(kind)]
+      when showLineInfo:
+        err = "invalid type: '$1' [1] for $2 [2]" % [typeToString(typ), toHumanStr(kind)]
+        err.add "\n  [1] " & lineInfo
+        err.add "\n  [2] " & lhsLineInfo
+      else:
+        err = "invalid type: '$1' for $2" % [typeToString(typ), toHumanStr(kind)]
       if kind in {skVar, skLet, skConst} and taIsTemplateOrMacro in flags:
         err &= ". Did you mean to call the $1 with '()'?" % [toHumanStr(typ.owner.kind)]
     else:
-      err = "invalid type: '$1' in this context: '$2' for $3" % [typeToString(t),
-              typeToString(typ), toHumanStr(kind)]
+      when showLineInfo:
+        err = "invalid type: '$1' [1] in this context: '$2' [2] for $3" %
+          [typeToString(t), typeToString(typ), toHumanStr(kind)]
+        err.add "\n  [1] " & lineInfo
+        err.add "\n  [2] " & lhsLineInfo
+      else:
+        err = "invalid type: '$1' in this context: '$2' for $3" %
+                [typeToString(t), typeToString(typ), toHumanStr(kind)]
     localError(c.config, info, err)
 
-proc paramsTypeCheck(c: PContext, typ: PType) {.inline.} =
-  typeAllowedCheck(c, typ.n.info, typ, skProc)
+proc paramsTypeCheck(c: PContext, lhsInfo: TLineInfo, typ: PType) {.inline.} =
+  typeAllowedCheck(c, lhsInfo, typ.n.info, typ, skProc)
 
 proc expectMacroOrTemplateCall(c: PContext, n: PNode): PSym
 proc semDirectOp(c: PContext, n: PNode, flags: TExprFlags; expectedType: PType = nil): PNode

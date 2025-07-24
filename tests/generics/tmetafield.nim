@@ -4,7 +4,7 @@ discard """
   nimout: '''
 tmetafield.nim(26, 5) Error: 'proc' is not a concrete type; for a callback without parameters use 'proc()'
 tmetafield.nim(27, 5) Error: 'Foo' is not a concrete type
-tmetafield.nim(29, 5) Error: invalid type: 'proc' in this context: 'TBaseMed' for var
+tmetafield.nim(29, 5) Error: invalid type: 'proc' [1] in this context: 'TBaseMed' [2] for var
 '''
 """
 

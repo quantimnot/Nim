@@ -1,5 +1,5 @@
 discard """
-  errormsg: "invalid type: 'typedesc[int]' for var"
+  errormsg: "invalid type: 'typedesc[int]' [1] for var [2]"
 """
 
 

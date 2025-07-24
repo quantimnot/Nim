@@ -1,5 +1,5 @@
 discard """
-  errormsg: "invalid type: 'empty' in this context: 'array[0..0, (string, seq[empty])]' for var"
+  errormsg: "invalid type: 'empty' [1] in this context: 'array[0..0, (string, seq[empty])]' [2] for var"
   line: 8
 """
 

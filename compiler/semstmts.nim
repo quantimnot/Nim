@@ -907,7 +907,7 @@ proc semVarOrLet(c: PContext, n: PNode, symkind: TSymKind): PNode =
 
     if c.matchedConcept != nil:
       typFlags.incl taConcept
-    typeAllowedCheck(c, a.info, typ, symkind, typFlags)
+    typeAllowedCheck(c, n.info, a.info, typ, symkind, typFlags)
 
     var tup = skipTypes(typ, {tyGenericInst, tyAlias, tySink})
     if a.kind == nkVarTuple:
@@ -1039,7 +1039,7 @@ proc semConst(c: PContext, n: PNode): PNode =
     if def.kind != nkNilLit:
       if c.matchedConcept != nil:
         typFlags.incl taConcept
-      typeAllowedCheck(c, a.info, typ, skConst, typFlags)
+      typeAllowedCheck(c, n.info, a.info, typ, skConst, typFlags)
     closeScope(c)
 
     if a.kind == nkVarTuple:
@@ -2635,7 +2635,7 @@ proc semProcAux(c: PContext, n: PNode, kind: TSymKind,
       if n[genericParamsPos].kind == nkEmpty or s.kind in {skMacro, skTemplate}:
         # Macros and Templates can have generic parameters, but they are only
         # used for overload resolution (there is no instantiation of the symbol)
-        if s.kind notin {skMacro, skTemplate} and s.magic == mNone: paramsTypeCheck(c, s.typ)
+        if s.kind notin {skMacro, skTemplate} and s.magic == mNone: paramsTypeCheck(c, n.info, s.typ)
         maybeAddResult(c, s, n)
         let resultType =
           if s.kind == skMacro:

@@ -464,7 +464,7 @@ proc generateInstance(c: PContext, fn: PSym, pt: LayeredIdTable,
     sideEffectsCheck(c, result)
     if result.magic notin {mSlice, mTypeOf}:
       # 'toOpenArray' is special and it is allowed to return 'openArray':
-      paramsTypeCheck(c, result.typ)
+      paramsTypeCheck(c, fn.info, result.typ)
     #echo "INSTAN ", fn.name.s, " ", typeToString(result.typ), " <-- NEW PROC!", " ", entry.concreteTypes.len
   else:
     #echo "INSTAN ", fn.name.s, " ", typeToString(result.typ), " <-- CACHED! ", typeToString(oldPrc.typ), " ", entry.concreteTypes.len

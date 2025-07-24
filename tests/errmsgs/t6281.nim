@@ -1,5 +1,5 @@
 discard """
-errormsg: "invalid type: 'SomeNumber' in this context: 'seq[SomeNumber]' for var"
+errormsg: "invalid type: 'SomeNumber' [1] in this context: 'seq[SomeNumber]' [2] for var"
 line: 6
 """
 

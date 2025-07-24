@@ -1,5 +1,5 @@
 discard """
-errormsg: "invalid type: 'SomeRefObj' in this context: 'seq[SomeRefObj]' for const"
+errormsg: "invalid type: 'SomeRefObj' [1] in this context: 'seq[SomeRefObj]' [2] for const"
 line: 14
 """
 

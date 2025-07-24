@@ -1,5 +1,5 @@
 discard """
-errormsg: "invalid type: 'object' for var"
+errormsg: "invalid type: 'object' [1] for var [2]"
 line: 6
 """
 

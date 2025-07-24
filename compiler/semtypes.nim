@@ -299,7 +299,7 @@ proc annotateClosureConv(n: PNode) =
     for i in 0..<n.len:
       annotateClosureConv(n[i])
 
-proc fitDefaultNode(c: PContext, n: var PNode, expectedType: PType) =
+proc fitDefaultNode(c: PContext, lhsInfo: TLineInfo, n: var PNode, expectedType: PType) =
   inc c.inStaticContext
   n = semConstExpr(c, n, expectedType = expectedType)
   let oldType = n.typ
@@ -315,7 +315,7 @@ proc fitDefaultNode(c: PContext, n: var PNode, expectedType: PType) =
   annotateClosureConv(n)
   # xxx any troubles related to defaults fields, consult `semConst` for a potential answer
   if n.kind != nkNilLit:
-    typeAllowedCheck(c, n.info, n.typ, skConst, {taProcContextIsNotMacro, taIsDefaultField})
+    typeAllowedCheck(c, lhsInfo, n.info, n.typ, skConst, {taProcContextIsNotMacro, taIsDefaultField})
   dec c.inStaticContext
 
 proc isRecursiveType*(t: PType): bool =
@@ -555,7 +555,7 @@ proc semTuple(c: PContext, n: PNode, prev: PType): PType =
         if typ == nil:
           typ = a[^1].typ
       else:
-        fitDefaultNode(c, a[^1], typ)
+        fitDefaultNode(c, a.info, a[^1], typ)
         typ = a[^1].typ
     elif a[^2].kind != nkEmpty:
       typ = semTypeNode(c, a[^2], nil)
@@ -927,7 +927,7 @@ proc semRecordNodeAux(c: PContext, n: PNode, check: var IntSet, pos: var int,
         if typ == nil:
           typ = n[^1].typ
       else:
-        fitDefaultNode(c, n[^1], typ)
+        fitDefaultNode(c, n.info, n[^1], typ)
         typ = n[^1].typ
         propagateToOwner(rectype, typ)
     elif n[^2].kind == nkEmpty:

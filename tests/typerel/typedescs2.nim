@@ -1,5 +1,5 @@
 discard """
-  errormsg: "invalid type: 'typedesc[Table]' for const"
+  errormsg: "invalid type: 'typedesc[Table]' [1] for const [2]"
   file: "typedescs2.nim"
   line: 16
 """
