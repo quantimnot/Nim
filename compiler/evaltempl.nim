@@ -10,7 +10,8 @@
 ## Template evaluation engine. Now hygienic.
 
 import options, ast, astalgo, msgs, renderer, lineinfos, idents, trees
-import std/strutils
+import std/[strutils, os]
+
 
 type
   TemplCtx = object
@@ -27,8 +28,7 @@ type
 proc copyNode(ctx: TemplCtx, a, b: PNode): PNode =
   result = copyNode(a)
   # Skip setInfoRecursive for quote-generated templates to preserve line info
-  let isQuoteGenerated = sfTemplateRedefinition in ctx.owner.flags and sfCallsite notin ctx.owner.flags
-  if ctx.instLines and not isQuoteGenerated: 
+  if ctx.instLines:
     setInfoRecursive(result, b.info)
 
 proc evalTemplateAux(templ, actual: PNode, c: var TemplCtx, result: PNode) =
@@ -221,15 +221,15 @@ proc evalTemplate*(n: PNode, tmpl, genSymOwner: PSym;
     result = copyNode(body)
     ctx.instLines = sfCallsite in tmpl.flags
     if ctx.instLines:
-      # Check if this is a quote-generated template
-      let isQuoteGenerated = sfTemplateRedefinition in tmpl.flags and sfCallsite notin tmpl.flags
-      if not isQuoteGenerated:
-        # For regular templates, use original behavior
-        setInfoRecursive(result, n.info)
+      # Set all nodes to the same info as instantiation node. This ensures stack
+      # traces are correct.
+      setInfoRecursive(result, n.info)
     for i in 0..<body.safeLen:
       evalTemplateAux(body[i], args, ctx, result)
   result.flags.incl nfFromTemplate
-  result = wrapInComesFrom(n.info, tmpl, result)
+  when false:
+    # nkComesFrom support needs fully implemented
+    result = wrapInComesFrom(n.info, tmpl, result)
   #if ctx.debugActive:
   #  echo "instantion of ", renderTree(result, {renderIds})
   dec(conf.evalTemplateCounter)

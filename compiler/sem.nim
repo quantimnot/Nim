@@ -544,7 +544,13 @@ proc semMacroExpr(c: PContext, n, nOrig: PNode, sym: PSym,
     message(c.config, nOrig.info, hintExpandMacro, renderTree(result, {
       renderNonExportedFields, renderDocComments, renderNoComments
     }))
-  result = wrapInComesFrom(nOrig.info, sym, result)
+  if sfCallsite in sym.flags:
+    # Set all nodes to the same info as instantiation node. This ensures stack
+    # traces are correct.
+    setInfoRecursive(result, nOrig.info)
+  when false:
+    # nkComesFrom support needs fully implemented
+    result = wrapInComesFrom(nOrig.info, sym, result)
   popInfoContext(c.config)
 
 proc forceBool(c: PContext, n: PNode): PNode =
