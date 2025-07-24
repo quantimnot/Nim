@@ -287,8 +287,10 @@ proc markAsClosure(g: ModuleGraph; owner: PSym; n: PNode) =
        " Consider using a <ref T> which can be captured.") %
       [s.name.s, typeToString(s.typ.skipTypes({tyVar})), g.config$s.info])
   elif not (owner.typ.isClosure or owner.isNimcall and not owner.isExplicitCallConv or isEnv):
-    localError(g.config, n.info, "illegal capture '$1' because '$2' has the calling convention: <$3>" %
-      [s.name.s, owner.name.s, $owner.typ.callConv])
+    var errMsg = "illegal capture '$1' because '$2' [1] has the calling convention: <$3>" %
+      [s.name.s, owner.name.s, $owner.typ.callConv]
+    errMsg.add("\n  [1] " & toFileLineCol(g.config, owner.info))
+    localError(g.config, n.info, errMsg)
   incl(owner.typ.flags, tfCapturesEnv)
   if not isEnv:
     owner.typ.callConv = ccClosure
