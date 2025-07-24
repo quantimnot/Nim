@@ -531,7 +531,7 @@ type
     mEqIdent, mEqNimrodNode, mSameNodeType, mGetImpl, mNGenSym,
     mNHint, mNWarning, mNError,
     mInstantiationInfo, mGetTypeInfo, mGetTypeInfoV2,
-    mNimvm, mIntDefine, mStrDefine, mBoolDefine, mGenericDefine, mRunnableExamples,
+    mNimvm, mVm, mIntDefine, mStrDefine, mBoolDefine, mGenericDefine, mRunnableExamples,
     mException, mBuiltinType, mSymOwner, mUncheckedArray, mGetImplTransf,
     mSymIsInstantiationOf, mNodeId, mPrivateAccess, mZeroDefault
 

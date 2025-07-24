@@ -1337,8 +1337,13 @@ proc semSym(c: PContext, n: PNode, sym: PSym, flags: TExprFlags): PNode =
     let typ = skipTypes(s.typ, abstractInst-{tyTypeDesc})
     case typ.kind
     of tyNil, tyChar, tyInt..tyInt64, tyFloat..tyFloat128,
-        tyTuple, tySet, tyUInt..tyUInt64:
-      if s.magic == mNone: result = inlineConst(c, n, s)
+        tyTuple, tySet, tyUInt..tyUInt64, tyBool:
+      if s.magic == mVm:
+        # Return true in static/VM context, false otherwise
+        let vmValue = c.inStaticContext > 0
+        result = newIntLit(c.graph, n.info, ord(vmValue))
+        result.typ() = s.typ  # Ensure correct type
+      elif s.magic == mNone: result = inlineConst(c, n, s)
       else: result = newSymNode(s, n.info)
     of tyArray, tySequence:
       # Consider::
@@ -1386,6 +1391,8 @@ proc semSym(c: PContext, n: PNode, sym: PSym, flags: TExprFlags): PNode =
   of skVar, skLet, skResult, skForVar:
     if s.magic == mNimvm:
       localError(c.config, n.info, "illegal context for 'nimvm' magic")
+    elif s.magic == mVm:
+      localError(c.config, n.info, "illegal context for 'vm' magic")
 
     if n.kind != nkDotExpr: # dotExpr is already checked by builtinFieldAccess
       markUsed(c, n.info, s)
@@ -2320,7 +2327,7 @@ proc semToTypedAst(c: PContext, n: PNode, magicSym: PSym,
     let typedArg = semExpr(c, arg, flags)
     # Create the magic call with the typed argument
     result = newTreeI(nkCall, n.info, n[0], typedArg)
-    result.typ = sysTypeFromName(c.graph, n.info, "NimNode")
+    result.typ() = sysTypeFromName(c.graph, n.info, "NimNode")
   else:
     result = semDirectOp(c, n, flags)
 
@@ -2687,9 +2694,11 @@ proc semWhen(c: PContext, n: PNode, semCheck = true): PNode =
     if exprNode.kind == nkOpenSym:
       exprNode = exprNode[0]
     if exprNode.kind == nkIdent:
-      whenNimvm = lookUp(c, exprNode).magic == mNimvm
+      let magic = lookUp(c, exprNode).magic
+      whenNimvm = magic == mNimvm or magic == mVm
     elif exprNode.kind == nkSym:
-      whenNimvm = exprNode.sym.magic == mNimvm
+      let magic = exprNode.sym.magic
+      whenNimvm = magic == mNimvm or magic == mVm
     if whenNimvm: n.flags.incl nfLL
 
   var cannotResolve = false

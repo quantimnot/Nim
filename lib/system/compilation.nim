@@ -15,7 +15,7 @@ const
     ## Odd for devel, even for releases.
 
 {.push profiler: off.}
-let nimvm* {.magic: "Nimvm", compileTime.}: bool = false
+let nimvm* {.magic: "Nimvm", compileTime, deprecated: "Use `vm` instead".}: bool = false
   ## May be used only in `when` expression.
   ## It is true in Nim VM context and false otherwise.
 {.pop.}
@@ -50,6 +50,23 @@ proc defined*(x: untyped): bool {.magic: "Defined", noSideEffect, compileTime.}
   ## * `compileOption <#compileOption,string>`_ for `on|off` options
   ## * `compileOption <#compileOption,string,string>`_ for enum options
   ## * `define pragmas <manual.html#implementation-specific-pragmas-compileminustime-define-pragmas>`_
+
+const vm* {.magic: "Vm".}: bool = false
+  ## Special compile-time constant that is true when the code
+  ## is being executed in the VM (compile-time context) and false
+  ## when executed at runtime.
+  ##
+  ## Unlike `nimvm`, `vm` is a proper compile-time constant expression
+  ## that can be used in any expression to create different code paths
+  ## for compile-time and runtime execution:
+  ##   ```nim
+  ##   when vm:
+  ##     # Code that only exists in compile-time context
+  ##     proc helper() = echo "compile time"
+  ##   else:
+  ##     # Code that only exists in runtime context
+  ##     template helper() = echo "runtime"
+  ##   ```
 
 proc declared*(x: untyped): bool {.magic: "Declared", noSideEffect, compileTime.}
   ## Special compile-time procedure that checks whether `x` is

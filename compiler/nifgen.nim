@@ -223,6 +223,7 @@ proc magicToNifTag(s: TMagic): (string, int) =
   case s
   of mNone: ("bug", NoMagic)
   of mDefined: ("defined", 0)
+  of mVm: ("vm", 0)
   of mDeclared: ("declared", 0)
   of mDeclaredInScope: ("declaredinscope", NoMagic)
   of mCompiles: ("compiles", 0)
