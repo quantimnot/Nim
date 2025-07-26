@@ -680,7 +680,7 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
     c.profiler.enter(c, tos)
     dbg &"DEBUG rawExecute: Executing opcode {instr.opcode} at pc={pc}"
     case instr.opcode
-    of opcEof: 
+    of opcEof:
       dbg &"DEBUG rawExecute: Reached opcEof, returning regs[{ra}].kind={regs[ra].kind}"
       return regs[ra]
     of opcRet:
@@ -867,7 +867,7 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
         dbg &"  src.typ.kind={src.typ.kind}"
         if src.typ.kind == tyPtr and src.typ.elementType != nil:
           dbg &"  src.typ.elementType.kind={src.typ.elementType.kind}"
-      
+
       # Debug the actual node content
       case src.kind:
       of nkIntLit:
@@ -883,32 +883,32 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
       # Only proceed if we have a proper pointer node (nkIntLit with address)
       let isUncheckedArrayPtr = (src.typ != nil and src.typ.kind == tyPtr and
                                 src.typ.elementType != nil and src.typ.elementType.kind == tyUncheckedArray)
-      
+
       dbg &"  isUncheckedArrayPtr={isUncheckedArrayPtr}, src.kind={src.kind}"
-      
+
       if isUncheckedArrayPtr and src.kind == nkIntLit:
         let elemType = src.typ.elementType.elementType
         let firstElemAddr = src.intVal  # This points to element 0 of the array
-        
+
         dbg &"  UncheckedArray deref: firstElemAddr={firstElemAddr}, idx={idx}"
-        
+
         # For VM UncheckedArray access, we need to find the parent array from element 0
         # and then access the correct index
         try:
           let firstElemPtr = cast[ptr PNode](firstElemAddr)
           let firstElem = firstElemPtr[]
-          
+
           if firstElem == nil:
             stackTrace(c, tos, pc, &"UncheckedArray base element points to nil")
-          
+
           # Find the parent array by going up from the first element
           # In the VM context, we need to find the nkBracket array that contains this element
           var parentArray: PNode = nil
-          
+
           # For VM UncheckedArray, we need to traverse up to find the parent
           # This is a bit complex, so let's use a different approach
           # We'll try to access the element at the specific index by calculating from element 0
-          
+
           if idx == 0:
             # Direct access to element 0
             dbg &"  Direct access to element 0"
@@ -921,10 +921,10 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
             # Let's try pointer arithmetic within the AST node structure
             let targetAddr = firstElemAddr + BiggestInt(idx) * sizeof(PNode)
             dbg &"  Calculated targetAddr for idx {idx}: {targetAddr}"
-            
+
             let nodePtr = cast[ptr PNode](targetAddr)
             let node = nodePtr[]
-            
+
             if node == nil:
               stackTrace(c, tos, pc, &"UncheckedArray[{idx}] address points to nil")
             else:
@@ -983,7 +983,7 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
         stackTrace(c, tos, pc, formatErrorIndexBound(regs[rc].intVal, high(int)))
       let idx = regs[rc].intVal.int
       let src = if regs[rb].kind == rkNode: regs[rb].node else: regs[rb].nodeAddr[]
-      
+
       # Debug opcLdArrAddr in detail
       dbg &"DEBUG opcLdArrAddr: idx={idx}, src.kind={src.kind}"
       if src.typ != nil:
@@ -999,19 +999,19 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
          src.kind == nkIntLit:
         dbg &"DEBUG opcLdArrAddr UncheckedArray case: src.intVal (base address)={src.intVal}"
         dbg &"  idx={idx}"
-        
+
         let elemType = src.typ.elementType.elementType
         let baseAddr = src.intVal
         let elemSize = getVMTypeSize(c, elemType)
         dbg &"  elemSize={elemSize}"
-        
+
         # PROPER APPROACH: Calculate address for any index
         dbg &"  Creating address for UncheckedArray element [{idx}]"
-        
+
         # Calculate the target address: baseAddr + (idx * elemSize)
         let targetAddr = baseAddr + BiggestInt(idx) * elemSize
         dbg &"  targetAddr = {baseAddr} + {idx} * {elemSize} = {targetAddr}"
-        
+
         # Create pointer node for the target address
         let ptrType = newType(tyPtr, c.idgen, c.module.owner, elemType)
         let elemPtr = newNodeIT(nkIntLit, c.debug[pc], ptrType)
@@ -1044,13 +1044,41 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
               if src.kind notin {nkEmpty..nkTripleStrLit}: src.len else: -1
             dbg &"  src.len={len}"
           if src.kind notin {nkEmpty..nkTripleStrLit} and idx <% src.len:
-            dbg &"  taking address of src.sons[{idx}]"
-            dbg &"  src.sons[{idx}].kind={src.sons[idx].kind}"
-            block:
-              template val: untyped =
-                if src.sons[idx].kind == nkIntLit: src.sons[idx].intVal else: 0
-              dbg &"  src.sons[{idx}].intVal={val}"
-            takeAddress regs[ra], src.sons[idx]
+            # Check if this is an array of small types that need proper byte addressing
+            if src.typ != nil and src.typ.kind == tyArray and
+               src.typ.elementType != nil:
+              let elemType = src.typ.elementType
+              let elemSize = getSize(c.config, elemType)
+              dbg &"  Array element type: {elemType.kind}, size: {elemSize}"
+
+              if elemSize < sizeof(pointer) and idx == 0:
+                # For first element, use normal addressing
+                dbg &"  taking address of src.sons[0] (first element)"
+                takeAddress regs[ra], src.sons[0]
+              elif elemSize < sizeof(pointer):
+                # For small types, we need to calculate proper byte offset
+                # Take address of first element and add byte offset
+                dbg &"  Small element type, calculating byte offset"
+                let firstElemAddr = cast[int](src.sons[0].addr)
+                let byteOffset = idx * int(elemSize)
+                dbg &"  firstElemAddr={firstElemAddr}, byteOffset={byteOffset}"
+
+                # Create a node representing the calculated address
+                let ptrType = newType(tyPtr, c.idgen, c.module.owner)
+                ptrType.add elemType
+                var addrNode = newNodeIT(nkIntLit, c.debug[pc], ptrType)
+                addrNode.intVal = firstElemAddr + byteOffset
+                addrNode.flags.incl nfIsPtr
+                ensureKind(rkNode)
+                regs[ra].node = addrNode
+                dbg &"  Created pointer node with address={addrNode.intVal}"
+              else:
+                # For larger types, use normal addressing
+                dbg &"  taking address of src.sons[{idx}] (normal addressing)"
+                takeAddress regs[ra], src.sons[idx]
+            else:
+              dbg &"  taking address of src.sons[{idx}] (fallback)"
+              takeAddress regs[ra], src.sons[idx]
             dbg &"  result nodeAddr={cast[int](regs[ra].nodeAddr)}"
           elif src.kind in nkStrKinds and idx <% src.strVal.len:
             regs[ra] = takeCharAddress(c, src, idx, pc)
@@ -1089,9 +1117,9 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
         dbg &"DEBUG opcWrArr UncheckedArray: idx={idx}, baseAddr={arr.intVal}"
         let elemType = arr.typ.elementType.elementType
         let firstElemAddr = arr.intVal
-        
+
         dbg &"  UncheckedArray write: firstElemAddr={firstElemAddr}, idx={idx}"
-        
+
         # Calculate the target address for the write operation
         try:
           if idx == 0:
@@ -1099,14 +1127,14 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
             dbg &"  Direct write to element 0"
             let firstElemPtr = cast[ptr PNode](firstElemAddr)
             let targetNode = firstElemPtr[]
-            
+
             if targetNode != nil and targetNode.kind in {nkIntLit, nkUIntLit}:
               # Get the value to write from the register
               let writeValue = case regs[rc].kind
                 of rkInt: regs[rc].intVal
                 of rkNode: regs[rc].node.intVal
                 else: 0
-              
+
               dbg &"  Writing value {writeValue} to node (from register kind {regs[rc].kind})"
               targetNode.intVal = writeValue
               dbg &"  Successfully wrote to UncheckedArray[0]"
@@ -1116,17 +1144,17 @@ proc rawExecute(c: PCtx, start: int, tos: PStackFrame): TFullReg =
             # Write to other indices using pointer arithmetic
             let targetAddr = firstElemAddr + BiggestInt(idx) * sizeof(PNode)
             dbg &"  Calculated write targetAddr for idx {idx}: {targetAddr}"
-            
+
             let nodePtr = cast[ptr PNode](targetAddr)
             let node = nodePtr[]
-            
+
             if node != nil and node.kind in {nkIntLit, nkUIntLit}:
               # Get the value to write from the register
               let writeValue = case regs[rc].kind
                 of rkInt: regs[rc].intVal
                 of rkNode: regs[rc].node.intVal
                 else: 0
-              
+
               dbg &"  Writing value {writeValue} to node at idx {idx} (from register kind {regs[rc].kind})"
               node.intVal = writeValue
               dbg &"  Successfully wrote to UncheckedArray[{idx}]"
