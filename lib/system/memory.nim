@@ -1,30 +1,43 @@
 {.push stack_trace: off.}
 
-const useLibC = not defined(nimNoLibc)
+const useLibC = not defined(nimNoLibc) and not vm
 
 when useLibC:
   import ansi_c
 
 proc nimCopyMem*(dest, source: pointer, size: Natural) {.nonReloadable, compilerproc, inline.} =
-  when nimvm:
-    var pd = dest
-    var ps = source
+  when useLibC:
+    c_memcpy(dest, source, cast[csize_t](size))
+  else:
+    let d = cast[ptr UncheckedArray[byte]](dest)
+    let s = cast[ptr UncheckedArray[byte]](source)
     var i = 0
     while i < size:
-      cast[ptr byte](pd)[] = cast[ptr byte](ps)[]
-      pd = cast[pointer](cast[int](pd) + 1)
-      ps = cast[pointer](cast[int](ps) + 1)
+      d[i] = s[i]
       inc i
+
+proc nimMoveMem*(dest, source: pointer, size: Natural) {.nonReloadable, compilerproc, inline.} =
+  when useLibC:
+    c_memmove(dest, source, cast[csize_t](size))
   else:
-    when useLibC:
-      c_memcpy(dest, source, cast[csize_t](size))
-    else:
+    {.cast(noSideEffect).}:
+      # Runtime: use proper overlap detection for efficiency
       let d = cast[ptr UncheckedArray[byte]](dest)
       let s = cast[ptr UncheckedArray[byte]](source)
-      var i = 0
-      while i < size:
-        d[i] = s[i]
-        inc i
+      
+      if cast[int](dest) < cast[int](source) or
+         cast[int](dest) >= cast[int](source) + size:
+        # No overlap or dest before source - copy forward
+        var i = 0
+        while i < size:
+          d[i] = s[i]
+          inc i
+      else:
+        # Overlap with dest after source - copy backward
+        var i = size
+        while i > 0:
+          dec i
+          d[i] = s[i]
 
 proc nimSetMem*(a: pointer, v: cint, size: Natural) {.nonReloadable, inline.} =
   when useLibC:
