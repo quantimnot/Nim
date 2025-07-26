@@ -139,7 +139,7 @@ enabled. Here are compiler options that are of interest when debugging:
 * `-d:nimDebug`:option: cause calls to `quit` to raise an assertion exception
 * `-d:nimDebugUtils`:option:\: enables various debugging utilities;
   see `compiler/debugutils`
-* `-d:stacktraceMsgs -d:nimCompilerStacktraceHints`:option:\: adds some additional
+* `--stacktraceMsgs -d:nimCompilerStacktraceHints`:option:\: adds some additional
   stacktrace hints; see https://github.com/nim-lang/Nim/pull/13351
 * `-u:leanCompiler`:option:\: enable JS and doc generation
 
