@@ -2718,6 +2718,12 @@ proc semIterator(c: PContext, n: PNode): PNode =
   if s.typ.callConv == ccClosure:
     incl(s.typ.flags, tfCapturesEnv)
   else:
+    # Ensure .closure is not in the pragmas.
+    if n[pragmasPos].kind != nkEmpty:
+      for i in 0 ..< n[pragmasPos].len:
+        for pragma in n[pragmasPos]:
+          if pragma.kind == nkIdent and pragma.ident.s == "closure":
+            localError(c.config, pragma.info, ".closure pragma is not applicable for inline iterators")
     s.typ.callConv = ccInline
   if result[bodyPos].kind == nkEmpty and s.magic == mNone and c.inConceptDecl == 0:
     localError(c.config, n.info, errImplOfXexpected % s.name.s)
