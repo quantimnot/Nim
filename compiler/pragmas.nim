@@ -12,7 +12,7 @@
 import
   condsyms, ast, astalgo, idents, semdata, msgs, renderer,
   wordrecg, ropes, options, extccomp, magicsys, trees,
-  types, lookups, lineinfos, pathutils, linter, modulepaths
+  types, lookups, lineinfos, pathutils, linter, modulepaths, stacktracenames
 
 from sigmatch import trySuggestPragmas
 
@@ -37,7 +37,7 @@ const
     wBorrow, wImportCompilerProc, wThread,
     wAsmNoStackFrame, wDiscardable, wNoInit, wCodegenDecl,
     wGensym, wInject, wRaises, wEffectsOf, wTags, wForbids, wLocks, wDelegator, wGcSafe,
-    wConstructor, wLiftLocals, wStackTrace, wLineTrace, wNoDestroy,
+    wConstructor, wLiftLocals, wStackTrace, wLineTrace, wStackTraceName, wNoDestroy,
     wRequires, wEnsures, wEnforceNoRaises, wSystemRaisesDefect, wVirtual, wQuirky, wMember}
   converterPragmas* = procPragmas
   methodPragmas* = procPragmas+{wBase}-{wImportCpp}
@@ -47,7 +47,7 @@ const
     wMagic, wNoSideEffect, wCompilerProc, wNonReloadable, wCore,
     wDiscardable, wGensym, wInject, wDelegator, wCallsite}
   iteratorPragmas* = declPragmas + {FirstCallConv..LastCallConv, wNoSideEffect, wSideEffect,
-    wMagic, wBorrow,
+    wMagic, wBorrow, wStackTraceName,
     wDiscardable, wGensym, wInject, wRaises, wEffectsOf,
     wTags, wForbids, wLocks, wGcSafe, wRequires, wEnsures}
   exprPragmas* = {wLine, wLocks, wNoRewrite, wGcSafe, wNoSideEffect}
@@ -68,7 +68,7 @@ const
     wFloatChecks, wInfChecks, wNanChecks, wDebugger}
   lambdaPragmas* = {FirstCallConv..LastCallConv,
     wNoSideEffect, wSideEffect, wNoreturn, wNosinks, wDynlib, wHeader,
-    wThread, wAsmNoStackFrame,
+    wThread, wAsmNoStackFrame, wStackTraceName,
     wRaises, wLocks, wTags, wForbids, wRequires, wEnsures, wEffectsOf,
     wGcSafe, wCodegenDecl, wNoInit, wCompileTime}
   typePragmas* = declPragmas + {wMagic, wAcyclic,
@@ -958,6 +958,14 @@ proc singlePragma(c: PContext, sym: PSym, n: PNode, i: var int,
         recordPragma(c, it, "cppdefine", name)
         processImportCompilerProc(c, sym, name, it.info)
       of wExtern: setExternName(c, sym, expectStrLit(c, it), it.info)
+      of wStackTraceName:
+        if sym != nil and sym.kind in {skProc, skMethod, skConverter, skIterator}:
+          let name = expectStrLit(c, it)
+          # Store the custom stack trace name in the global table
+          storeStackTraceName(sym.id, name)
+          recordPragma(c, it, "stackTraceName", name)
+        else:
+          invalidPragma(c, it)
       of wDirty:
         if sym.kind == skTemplate: incl(sym.flags, sfDirty)
         else: invalidPragma(c, it)

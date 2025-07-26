@@ -77,6 +77,7 @@ type
     wDeadCodeElimUnused = "deadCodeElim",  # deprecated, dead code elim always happens
     wSafecode = "safecode", wPackage = "package", wNoForward = "noforward", wReorder = "reorder",
     wNoRewrite = "norewrite", wNoDestroy = "nodestroy", wPragma = "pragma",
+    wStackTraceName = "stackTraceName",
     wCompileTime = "compileTime", wNoInit = "noinit", wPassc = "passc", wPassl = "passl",
     wLocalPassc = "localPassC", wBorrow = "borrow", wDiscardable = "discardable",
     wFieldChecks = "fieldChecks", wSubsChar = "subschar", wAcyclic = "acyclic",

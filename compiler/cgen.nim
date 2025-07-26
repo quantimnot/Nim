@@ -16,7 +16,7 @@ import
   rodutils, renderer, cgendata, aliases,
   lowerings, lineinfos, pathutils, transf,
   injectdestructors, astmsgs, modulepaths, pushpoppragmas,
-  mangleutils, cbuilderbase
+  mangleutils, cbuilderbase, stacktracenames
 
 from expanddefaults import caseObjDefaultBranch
 
@@ -27,6 +27,13 @@ when defined(nimPreviewSlimSystem):
 
 when not defined(leanCompiler):
   import spawn, semparallel
+
+proc getStackTraceName(prc: PSym): string =
+  ## Get the custom stack trace name from the stored table, or the default name
+  let customName = stacktracenames.getStackTraceName(prc.id)
+  if customName != "":
+    return customName
+  return prc.name.s
 
 import std/strutils except `%`, addf # collides with ropes.`%`
 
@@ -1366,7 +1373,7 @@ proc genProcAux*(m: BModule, prc: PSym) =
       generatedProc.finishProcHeaderWithBody():
         if optStackTrace in prc.options:
           generatedProc.add(extract(p.s(cpsLocals)))
-          var procname = makeCString(prc.name.s)
+          var procname = makeCString(getStackTraceName(prc))
           generatedProc.add(initFrame(p, procname, quotedFilename(p.config, prc.info)))
         else:
           generatedProc.add(extract(p.s(cpsLocals)))
