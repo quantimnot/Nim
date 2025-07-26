@@ -35,7 +35,7 @@ proc raiseAssert*(msg: string) {.noinline, noreturn, nosinks.} =
   else:
     sysFatal(AssertionDefect, msg)
 
-proc failedAssertImpl*(msg: string) {.raises: [], tags: [].} =
+template failedAssertImpl*(msg: string) {.callsite.} =
   ## Raises an `AssertionDefect` with `msg`, but this is hidden
   ## from the effect system. Called when an assertion failed.
   raiseAssert(msg)
@@ -51,7 +51,7 @@ template assertImpl(cond: bool, msg: string, expr: string, enabled: static[bool]
       if not cond:
         failedAssertImpl(ploc & " `" & expr & "` " & msg)
 
-template assert*(cond: untyped, msg = "") =
+template assert*(cond: untyped, msg = "") {.callsite.} =
   ## Raises `AssertionDefect` with `msg` if `cond` is false. Note
   ## that `AssertionDefect` is hidden from the effect system, so it doesn't
   ## produce `{.raises: [AssertionDefect].}`. This exception is only supposed
@@ -65,7 +65,7 @@ template assert*(cond: untyped, msg = "") =
   runnableExamples("-d:danger"): assert 1 == 2 # ditto
   assertImpl(cond, msg, astToStr(cond), compileOption("assertions"))
 
-template doAssert*(cond: untyped, msg = "") =
+template doAssert*(cond: untyped, msg = "") {.callsite.} =
   ## Similar to `assert <#assert.t,untyped,string>`_ but is always turned on regardless of `--assertions`.
   runnableExamples:
     doAssert 1 == 1 # generates code even when built with `-d:danger` or `--assertions:off`
@@ -84,7 +84,7 @@ template onFailedAssert*(msg, code: untyped): untyped {.dirty.} =
     doAssertRaises(MyError): doAssert false
   when not defined(nimHasTemplateRedefinitionPragma):
     {.pragma: redefine.}
-  template failedAssertImpl(msgIMPL: string): untyped {.dirty, redefine.} =
+  template failedAssertImpl(msgIMPL: string): untyped {.dirty, redefine, callsite.} =
     let msg = msgIMPL
     code
 

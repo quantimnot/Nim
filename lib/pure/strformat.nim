@@ -745,7 +745,10 @@ proc strformatImpl(f: string; openChar, closeChar: char,
   when defined(debugFmtDsl):
     echo repr result
 
-macro fmt(pattern: static string; openChar: static char, closeChar: static char, lineInfoNode: untyped): string =
+when not defined(nimHasMacroCallsitePragma):
+  {.pragma: callsite.}
+
+macro fmt(pattern: static string; openChar: static char, closeChar: static char, lineInfoNode: untyped): string {.callsite.} =
   ## version of `fmt` with dummy untyped param for line info
   strformatImpl(pattern, openChar, closeChar, lineInfoNode)
 

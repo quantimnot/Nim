@@ -49,10 +49,10 @@ elif quirkyExceptions and not defined(nimscript):
     sysFatal(exceptn, message, "")
 
 else:
-  func sysFatal(exceptn: typedesc[Defect], message: string) {.inline, noreturn.} =
+  template sysFatal(exceptn: typedesc[Defect], message: string) {.callsite.} =
     raise (ref exceptn)(msg: message)
 
-  func sysFatal(exceptn: typedesc[Defect], message, arg: string) {.inline, noreturn.} =
+  template sysFatal(exceptn: typedesc[Defect], message, arg: string) {.callsite.} =
     raise (ref exceptn)(msg: message & arg)
 
 {.pop.}

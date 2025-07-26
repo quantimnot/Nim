@@ -599,7 +599,7 @@ proc alignof*(x: typedesc): int {.magic: "AlignOf", noSideEffect.}
 
 proc offsetOfDotExpr(typeAccess: typed): int {.magic: "OffsetOf", noSideEffect, compileTime.}
 
-template offsetOf*[T](t: typedesc[T]; member: untyped): int =
+template offsetOf*[T](t: typedesc[T]; member: untyped): int {.callsite.} =
   var tmp {.noinit.}: ptr T
   offsetOfDotExpr(tmp[].member)
 
@@ -1758,7 +1758,7 @@ when defined(nimV2):
   include system/arc
 
 template newException*(exceptn: typedesc, message: string;
-                       parentException: ref Exception = nil): untyped =
+                       parentException: ref Exception = nil): untyped {.callsite.} =
   ## Creates an exception object of type `exceptn` and sets its `msg` field
   ## to `message`. Returns the new exception object.
   (ref exceptn)(msg: message, parent: parentException)
