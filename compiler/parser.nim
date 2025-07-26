@@ -1155,11 +1155,10 @@ proc parseParamList(p: var Parser, retColon = true): PNode =
       of tkVar:
         parMessage(p, errGenerated, "the syntax is 'parameter: var T', not 'var parameter: T'")
         break
+      elif p.tok.tokType in tokKeywordLow..tokKeywordHigh:
+        a = parseIdentColonEquals(p, {withBothOptional, withPragma})
       else:
-        if p.tok.tokType in tokKeywordLow..tokKeywordHigh:
-          parMessage(p, errGenerated, "'" & $p.tok.ident.s & "' is a keyword and cannot be used as a parameter name")
-        else:
-          parMessage(p, "expected closing ')'")
+        parMessage(p, "expected closing ')'")
         break
       result.add(a)
       if p.tok.tokType notin {tkComma, tkSemiColon}: break
