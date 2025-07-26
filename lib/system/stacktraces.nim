@@ -21,7 +21,7 @@ when defined(nimStackTraceOverride):
     cuintptr_t* {.importc: "uintptr_t", nodecl.} = uint
       ## This is the same as the type `uintptr_t` in C.
 
-    StackTraceOverrideGetTracebackProc* = proc (): string {.
+    StackTraceOverrideGetTracebackProc* = proc (entries: seq[StackTraceEntry]): string {.
       nimcall, gcsafe, raises: [], tags: [], noinline.}
     StackTraceOverrideGetProgramCountersProc* = proc (maxLength: cint): seq[cuintptr_t] {.
       nimcall, gcsafe, raises: [], tags: [], noinline.}
@@ -33,7 +33,7 @@ when defined(nimStackTraceOverride):
   # override are supposed to register their own versions).
   var
     stackTraceOverrideGetTraceback: StackTraceOverrideGetTracebackProc =
-      proc (): string {.nimcall, gcsafe, raises: [], tags: [], noinline.} =
+      proc (entries: seq[StackTraceEntry]): string {.nimcall, gcsafe, raises: [], tags: [], noinline.} =
         discard
         #result = "Stack trace override procedure not registered.\n"
     stackTraceOverrideGetProgramCounters: StackTraceOverrideGetProgramCountersProc =
@@ -55,8 +55,9 @@ when defined(nimStackTraceOverride):
     stackTraceOverrideGetDebuggingInfo = overrideProc
 
   # Custom stack trace manipulation.
-  proc auxWriteStackTraceWithOverride*(s: var string) =
-    add(s, stackTraceOverrideGetTraceback())
+  proc auxWriteStackTraceWithOverride*(s: var string, realEntries: seq[StackTraceEntry]) =
+    # Call the override with real stack trace data
+    add(s, stackTraceOverrideGetTraceback(realEntries))
 
   proc auxWriteStackTraceWithOverride*(s: var seq[StackTraceEntry]) =
     let programCounters = stackTraceOverrideGetProgramCounters(maxStackTraceLines)

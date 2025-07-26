@@ -328,7 +328,12 @@ when hasSomeStackTrace:
   proc rawWriteStackTrace(s: var string) =
     when defined(nimStackTraceOverride):
       add(s, "Traceback (most recent call last, using override)\n")
-      auxWriteStackTraceWithOverride(s)
+      # Get real stack trace entries and pass them to the override
+      var realEntries: seq[StackTraceEntry]
+      when NimStackTrace:
+        if framePtr != nil:
+          auxWriteStackTrace(framePtr, realEntries)
+      auxWriteStackTraceWithOverride(s, realEntries)
     elif NimStackTrace:
       if framePtr == nil:
         add(s, noStacktraceAvailable)
@@ -485,7 +490,13 @@ proc raiseExceptionEx(e: sink(ref Exception), ename, procname, filename: cstring
         rawWriteStackTrace(e.trace)
       else:
         e.trace.add reraisedFrom(reraisedFromBegin)
-        auxWriteStackTraceWithOverride(e.trace)
+        # Get real stack trace entries for the override
+        var realEntries: seq[StackTraceEntry]
+        when NimStackTrace:
+          if framePtr != nil:
+            auxWriteStackTrace(framePtr, realEntries)
+        # For seq version, we add the real entries directly
+        e.trace.add(realEntries)
         e.trace.add reraisedFrom(reraisedFromEnd)
     elif NimStackTrace:
       if e.trace.len == 0:
