@@ -18,6 +18,8 @@ import
   gorgeimpl, lineinfos, btrees, macrocacheimpl,
   modulegraphs, sighashes, int128, vmprofiler
 
+import vmdebugapi
+
 when defined(nimPreviewSlimSystem):
   import std/formatfloat
 import ast except getstr

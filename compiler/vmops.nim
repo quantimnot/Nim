@@ -43,7 +43,7 @@ from packages import getPackageSymbol, getModulePackageDir
 from condsyms import definedSymbolNames
 
 # There are some useful procs in vmconv.
-import vmconv, vmmarshal
+import vmconv, vmmarshal, vmdebugapi
 
 template mathop(op) {.dirty.} =
   registerCallback(c, "stdlib.math." & astToStr(op), `op Wrapper`)
@@ -446,3 +446,50 @@ proc registerAdditionalOps*(c: PCtx) =
     let n = getNode(a, 0)
     let copyFrom = getNode(a, 1)
     setInfoRecursive(n, copyFrom.info)
+
+  # VM Debugging API builtins
+  registerCallback c, "stdlib.vmdebug.vmDumpContext", proc(a: VmArgs) =
+    vmDebugDumpContext(c)
+    
+  registerCallback c, "stdlib.vmdebug.vmDumpNode", proc(a: VmArgs) =
+    let node = getNode(a, 0)
+    let depth = getInt(a, 1)
+    vmDebugDumpNode(node, depth.int)
+    
+  registerCallback c, "stdlib.vmdebug.vmTraceUncheckedArray", proc(a: VmArgs) =
+    let address = getInt(a, 0)
+    let operation = getString(a, 1)
+    vmDebugTraceUncheckedArray(address, operation)
+    
+  registerCallback c, "stdlib.vmdebug.vmNodeToYaml", proc(a: VmArgs) =
+    let node = getNode(a, 0)
+    let yamlRepr = nodeToYamlRepr(cast[pointer](node))
+    setResult(a, yamlRepr)
+    
+  registerCallback c, "stdlib.vmdebug.vmNodeKind", proc(a: VmArgs) =
+    let node = getNode(a, 0)
+    let kindName = getNodeKindName(cast[pointer](node))
+    setResult(a, kindName)
+    
+  registerCallback c, "stdlib.vmdebug.vmNodeType", proc(a: VmArgs) =
+    let node = getNode(a, 0)
+    let typeName = getNodeTypeName(cast[pointer](node))
+    setResult(a, typeName)
+    
+  registerCallback c, "stdlib.vmdebug.vmTraceAssignment", proc(a: VmArgs) =
+    let regKind = getString(a, 0)
+    let nodeKind = getString(a, 1)
+    let description = getString(a, 2)
+    vmDebugTraceAssignment(regKind, nodeKind, description)
+    
+  registerCallback c, "stdlib.vmdebug.vmTraceRefCounting", proc(a: VmArgs) =
+    let nodeAddr = getInt(a, 0)
+    let nodeKind = getString(a, 1)
+    let operation = getString(a, 2)
+    vmDebugTraceRefCounting(nodeAddr, nodeKind, operation)
+    
+  registerCallback c, "stdlib.vmdebug.vmTraceWriteField", proc(a: VmArgs) =
+    let fieldName = getString(a, 0)
+    let srcKind = getString(a, 1)
+    let destKind = getString(a, 2)
+    vmDebugTraceWriteField(fieldName, srcKind, destKind)
