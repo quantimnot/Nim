@@ -543,6 +543,9 @@ type
       trace*: string
     else:
       trace*: seq[StackTraceEntry]
+    when not defined(nimsuggest):
+      reraiseMode*: string   ## Controls how reraises are displayed in stack traces.
+                            ## Valid modes: "clean", "compact", "hidden", "verbose"
     up: ref Exception # used for stacking exceptions. Not exported!
 
   Defect* = object of Exception ## \

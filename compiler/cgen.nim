@@ -2085,6 +2085,18 @@ proc hcrGetProcLoadCode(builder: var Builder, m: BModule, sym, prefix, handle, g
   builder.addAssignment(tmp, cCast(getTypeDesc(m, prc.typ, dkVar),
     cCall(getProcFunc, handle, makeCString(prefix & sym))))
 
+proc genReraiseInitCode(m: BModule) =
+  ## Generate initialization code for reraise modes
+  # Note: This will generate init code for ALL modules, but that's OK
+  # since setReraiseMode can be called multiple times safely
+  let reraiseModes = stacktracenames.getAllReraiseModes()
+  for entry in reraiseModes:
+    let procName = entry[0]
+    let mode = entry[1]
+    m.s[cfsInitProc].addCallStmt(cgsymValue(m, "setReraiseMode"),
+      makeCString(procName),
+      makeCString(mode))
+
 proc genInitCode(m: BModule) =
   ## this function is called in cgenWriteModules after all modules are closed,
   ## it means raising dependency on the symbols is too late as it will not propagate
@@ -2221,6 +2233,7 @@ proc genInitCode(m: BModule) =
     m.s[cfsInitProc].add(extract(procs))
     #rememberFlag(m.g.graph, m.module, HasModuleInitProc)
 
+  # genReraiseInitCode(m)  # TODO: Fix runtime initialization
   genDatInitCode(m)
 
   if m.hcrOn:

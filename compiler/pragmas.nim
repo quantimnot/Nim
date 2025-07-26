@@ -37,7 +37,7 @@ const
     wBorrow, wImportCompilerProc, wThread,
     wAsmNoStackFrame, wDiscardable, wNoInit, wCodegenDecl,
     wGensym, wInject, wRaises, wEffectsOf, wTags, wForbids, wLocks, wDelegator, wGcSafe,
-    wConstructor, wLiftLocals, wStackTrace, wLineTrace, wStackTraceName, wNoDestroy,
+    wConstructor, wLiftLocals, wStackTrace, wLineTrace, wStackTraceName, wReraiseMode, wNoDestroy,
     wRequires, wEnsures, wEnforceNoRaises, wSystemRaisesDefect, wVirtual, wQuirky, wMember}
   converterPragmas* = procPragmas
   methodPragmas* = procPragmas+{wBase}-{wImportCpp}
@@ -47,7 +47,7 @@ const
     wMagic, wNoSideEffect, wCompilerProc, wNonReloadable, wCore,
     wDiscardable, wGensym, wInject, wDelegator, wCallsite}
   iteratorPragmas* = declPragmas + {FirstCallConv..LastCallConv, wNoSideEffect, wSideEffect,
-    wMagic, wBorrow, wStackTrace, wLineTrace, wStackTraceName,
+    wMagic, wBorrow, wStackTrace, wLineTrace, wStackTraceName, wReraiseMode,
     wDiscardable, wGensym, wInject, wRaises, wEffectsOf,
     wTags, wForbids, wLocks, wGcSafe, wRequires, wEnsures}
   exprPragmas* = {wLine, wLocks, wNoRewrite, wGcSafe, wNoSideEffect}
@@ -68,7 +68,7 @@ const
     wFloatChecks, wInfChecks, wNanChecks, wDebugger}
   lambdaPragmas* = {FirstCallConv..LastCallConv,
     wNoSideEffect, wSideEffect, wNoreturn, wNosinks, wDynlib, wHeader,
-    wThread, wAsmNoStackFrame, wStackTraceName,
+    wThread, wAsmNoStackFrame, wStackTraceName, wReraiseMode,
     wRaises, wLocks, wTags, wForbids, wRequires, wEnsures, wEffectsOf,
     wGcSafe, wCodegenDecl, wNoInit, wCompileTime}
   typePragmas* = declPragmas + {wMagic, wAcyclic,
@@ -964,6 +964,18 @@ proc singlePragma(c: PContext, sym: PSym, n: PNode, i: var int,
           # Store the custom stack trace name in the global table
           storeStackTraceName(sym.id, name)
           recordPragma(c, it, "stackTraceName", name)
+        else:
+          invalidPragma(c, it)
+      of wReraiseMode:
+        if sym != nil and sym.kind in {skProc, skMethod, skConverter, skIterator}:
+          let mode = expectStrLit(c, it)
+          # Validate reraise mode
+          case mode
+          of "clean", "compact", "hidden", "verbose":
+            storeReraiseMode(sym.id, mode, sym.name.s)
+            recordPragma(c, it, "reraiseMode", mode)
+          else:
+            localError(c.config, it.info, "invalid reraise mode: '" & mode & "'. Valid modes are: clean, compact, hidden, verbose")
         else:
           invalidPragma(c, it)
       of wDirty:

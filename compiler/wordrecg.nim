@@ -78,6 +78,7 @@ type
     wSafecode = "safecode", wPackage = "package", wNoForward = "noforward", wReorder = "reorder",
     wNoRewrite = "norewrite", wNoDestroy = "nodestroy", wPragma = "pragma",
     wStackTraceName = "stackTraceName",
+    wReraiseMode = "reraiseMode",
     wCompileTime = "compileTime", wNoInit = "noinit", wPassc = "passc", wPassl = "passl",
     wLocalPassc = "localPassC", wBorrow = "borrow", wDiscardable = "discardable",
     wFieldChecks = "fieldChecks", wSubsChar = "subschar", wAcyclic = "acyclic",

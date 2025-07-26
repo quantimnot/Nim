@@ -12,6 +12,8 @@
 
 import std/private/miscdollars
 import stacktraces
+when not defined(nimsuggest):
+  import reraisemode
 
 const noStacktraceAvailable = "No stack traceback available\n"
 
@@ -266,7 +268,7 @@ template addFrameEntry(s: var string, f: StackTraceEntry|PFrame) =
       for i in first..<f.frameMsgLen: add(s, frameMsgBuf[i])
   add(s, "\n")
 
-proc `$`(stackTraceEntries: seq[StackTraceEntry]): string =
+proc formatStackTrace(stackTraceEntries: seq[StackTraceEntry], reraiseMode: string = ""): string =
   when defined(nimStackTraceOverride):
     let s = addDebuggingInfo(stackTraceEntries)
   else:
@@ -274,9 +276,21 @@ proc `$`(stackTraceEntries: seq[StackTraceEntry]): string =
 
   result = newStringOfCap(2000)
   for i in 0 .. s.len-1:
-    if s[i].line == reraisedFromBegin: result.add "[[reraised from:\n"
-    elif s[i].line == reraisedFromEnd: result.add "]]\n"
+    if s[i].line == reraisedFromBegin:
+      case reraiseMode
+      of "clean": discard  # Skip reraise markers in clean mode
+      of "compact": result.add "[reraised]\n"
+      of "hidden": discard  # Skip reraise markers in hidden mode
+      else: result.add "[[reraised from:\n"  # verbose mode (default)
+    elif s[i].line == reraisedFromEnd:
+      case reraiseMode
+      of "clean", "compact", "hidden": discard  # Skip end markers in these modes
+      else: result.add "]]\n"  # verbose mode (default)
     else: addFrameEntry(result, s[i])
+
+proc `$`(stackTraceEntries: seq[StackTraceEntry]): string =
+  # Default behavior with verbose reraise mode
+  formatStackTrace(stackTraceEntries, "verbose")
 
 when hasSomeStackTrace:
 
@@ -382,7 +396,10 @@ proc reportUnhandledErrorAux(e: ref Exception) {.nodestroy, gcsafe.} =
     if e.trace.len == 0:
       rawWriteStackTrace(buf)
     else:
-      var trace = $e.trace
+      when not defined(nimsuggest):
+        var trace = formatStackTrace(e.trace, e.reraiseMode)
+      else:
+        var trace = formatStackTrace(e.trace)
       add(buf, trace)
       {.gcsafe.}:
         `=destroy`(trace)
@@ -409,7 +426,10 @@ proc reportUnhandledErrorAux(e: ref Exception) {.nodestroy, gcsafe.} =
     var buf: array[0..2000, char]
     var L = 0
     if e.trace.len != 0:
-      var trace = $e.trace
+      when not defined(nimsuggest):
+        var trace = formatStackTrace(e.trace, e.reraiseMode)
+      else:
+        var trace = formatStackTrace(e.trace)
       add(buf, trace)
       {.gcsafe.}:
         `=destroy`(trace)
@@ -484,6 +504,10 @@ proc raiseExceptionAux(e: sink(ref Exception)) {.nodestroy.} =
 proc raiseExceptionEx(e: sink(ref Exception), ename, procname, filename: cstring,
                       line: int) {.compilerRtl, nodestroy.} =
   if e.name.isNil: e.name = ename
+  # Set the reraise mode from the procedure's pragma
+  when not defined(nimsuggest):
+    if procname != nil:
+      e.reraiseMode = getReraiseMode($procname)
   when hasSomeStackTrace:
     when defined(nimStackTraceOverride):
       if e.trace.len == 0:
@@ -547,7 +571,10 @@ proc getStackTrace(): string =
 
 proc getStackTrace(e: ref Exception): string =
   if not isNil(e):
-    result = $e.trace
+    when not defined(nimsuggest):
+      result = formatStackTrace(e.trace, e.reraiseMode)
+    else:
+      result = formatStackTrace(e.trace)
   else:
     result = ""
 
