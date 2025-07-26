@@ -1077,7 +1077,7 @@ proc genFieldCheck(p: BProc, e: PNode, obj: Rope, field: PSym) =
       # by encoding the file names separately from `file(line:col)`, essentially
       # passing around `TLineInfo` + the set of files in the project.
       msg.add toFileLineCol(p.config, e.info) & " "
-    msg.add genFieldDefect(p.config, field.name.s, disc.sym)
+    msg.add genFieldDefect(p.config, field.name.s, disc.sym, e.info)
     var strLitBuilder = newBuilder("")
     genStringLiteral(p.module, newStrNode(nkStrLit, msg), strLitBuilder)
     let strLit = extract(strLitBuilder)

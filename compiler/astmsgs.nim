@@ -1,6 +1,6 @@
 # this module avoids ast depending on msgs or vice versa
 import std/strutils
-import options, ast, msgs
+import options, ast, msgs, lineinfos
 
 proc typSym*(t: PType): PSym =
   result = t.sym
@@ -37,9 +37,12 @@ template quoteExpr*(a: string): untyped =
   ## can be used for quoting expressions in error msgs.
   "'" & a & "'"
 
-proc genFieldDefect*(conf: ConfigRef, field: string, disc: PSym): string =
+proc genFieldDefect*(conf: ConfigRef, field: string, disc: PSym, info: TLineInfo): string =
   let obj = disc.owner.name.s # `types.typeToString` might be better, eg for generics
-  result = "field '$#' is not accessible for type '$#'" % [field, obj]
   if optDeclaredLocs in conf.globalOptions:
-    result.add " [discriminant declared in $#]" % toFileLineCol(conf, disc.info)
-  result.add " using '$# = " % disc.name.s
+    result = "field '$#' is not accessible [1] for type '$#' [2] using '$# = " % [field, obj, disc.name.s]
+  else:
+    result = "field '$#' is not accessible [1] for type '$#' using '$# = " % [field, obj, disc.name.s]
+  result.add "\n  [1] " & toFileLineCol(conf, info)
+  if optDeclaredLocs in conf.globalOptions:
+    result.add "\n  [2] $#" % toFileLineCol(conf, disc.info)

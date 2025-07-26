@@ -1860,7 +1860,7 @@ proc genCheckedObjAccessAux(c: PCtx; n: PNode; dest: var TDest; flags: TGenFlags
   let strType = getSysType(c.graph, n.info, tyString)
   var msgReg: TDest = c.getTemp(strType)
   let fieldName = $accessExpr[1]
-  let msg = genFieldDefect(c.config, fieldName, disc.sym)
+  let msg = genFieldDefect(c.config, fieldName, disc.sym, n.info)
   let strLit = newStrNode(msg, accessExpr[1].info)
   strLit.typ() = strType
   c.genLit(strLit, msgReg)
