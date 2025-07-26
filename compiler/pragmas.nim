@@ -47,7 +47,7 @@ const
     wMagic, wNoSideEffect, wCompilerProc, wNonReloadable, wCore,
     wDiscardable, wGensym, wInject, wDelegator, wCallsite}
   iteratorPragmas* = declPragmas + {FirstCallConv..LastCallConv, wNoSideEffect, wSideEffect,
-    wMagic, wBorrow, wStackTraceName,
+    wMagic, wBorrow, wStackTrace, wLineTrace, wStackTraceName,
     wDiscardable, wGensym, wInject, wRaises, wEffectsOf,
     wTags, wForbids, wLocks, wGcSafe, wRequires, wEnsures}
   exprPragmas* = {wLine, wLocks, wNoRewrite, wGcSafe, wNoSideEffect}
