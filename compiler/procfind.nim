@@ -46,7 +46,10 @@ proc searchForProcAux(c: PContext, scope: PScope, fn: PSym): PSym =
           localError(c.config, fn.info, message)
         return
       of paramsIncompatible:
-        localError(c.config, fn.info, "overloaded '$1' leads to ambiguous calls" % fn.name.s)
+        var msg = "overloaded '$1' leads to ambiguous calls" % fn.name.s
+        msg.add "\n  [1] " & toFileLineCol(c.config, result.info)
+        msg.add "\n  [2] " & toFileLineCol(c.config, fn.info)
+        localError(c.config, fn.info, msg)
         return
       of paramsNotEqual:
         discard
