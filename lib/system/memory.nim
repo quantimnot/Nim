@@ -8,6 +8,15 @@ when useLibC:
 proc nimCopyMem*(dest, source: pointer, size: Natural) {.nonReloadable, compilerproc, inline.} =
   when useLibC:
     c_memcpy(dest, source, cast[csize_t](size))
+  elif defined(js):
+    # JavaScript backend: arrays and indices are passed separately
+    {.emit: """
+    if (`size` > 0) {
+      for (var i = 0; i < `size`; i++) {
+        `dest`[`dest`_Idx + i] = `source`[`source`_Idx + i];
+      }
+    }
+    """.}
   else:
     # let d = cast[ptr UncheckedArray[byte]](dest)
     # let s = cast[ptr UncheckedArray[byte]](source)
@@ -27,6 +36,23 @@ proc nimCopyMem*(dest, source: pointer, size: Natural) {.nonReloadable, compiler
 proc nimMoveMem*(dest, source: pointer, size: Natural) {.nonReloadable, compilerproc, inline.} =
   when useLibC:
     c_memmove(dest, source, cast[csize_t](size))
+  elif defined(js):
+    # JavaScript backend: handle overlapping memory regions
+    {.emit: """
+    if (`size` > 0) {
+      if (`dest` === `source` && `dest`_Idx > `source`_Idx && `dest`_Idx < `source`_Idx + `size`) {
+        // Overlapping, copy backwards
+        for (var i = `size` - 1; i >= 0; i--) {
+          `dest`[`dest`_Idx + i] = `source`[`source`_Idx + i];
+        }
+      } else {
+        // No overlap or safe to copy forward
+        for (var i = 0; i < `size`; i++) {
+          `dest`[`dest`_Idx + i] = `source`[`source`_Idx + i];
+        }
+      }
+    }
+    """.}
   else:
     {.cast(noSideEffect).}:
       var pd = dest
