@@ -1,6 +1,6 @@
 {.push stack_trace: off.}
 
-const useLibC = not defined(nimNoLibc) and not vm
+const useLibC = not defined(nimNoLibc) and not vm and not defined(js)
 
 when useLibC:
   import ansi_c

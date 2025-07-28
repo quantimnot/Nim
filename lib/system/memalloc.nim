@@ -1,50 +1,49 @@
-when notJSnotNims:
-  proc zeroMem*(p: pointer, size: Natural) {.inline, noSideEffect,
-    tags: [], raises: [].}
-    ## Overwrites the contents of the memory at `p` with the value 0.
-    ##
-    ## Exactly `size` bytes will be overwritten. Like any procedure
-    ## dealing with raw memory this is **unsafe**.
+proc zeroMem*(p: pointer, size: Natural) {.inline, noSideEffect,
+  tags: [], raises: [].}
+  ## Overwrites the contents of the memory at `p` with the value 0.
+  ##
+  ## Exactly `size` bytes will be overwritten. Like any procedure
+  ## dealing with raw memory this is **unsafe**.
 
-  proc copyMem*(dest, source: pointer, size: Natural) {.inline, benign,
-    tags: [], raises: [].}
-    ## Copies the contents from the memory at `source` to the memory
-    ## at `dest`.
-    ## Exactly `size` bytes will be copied. The memory
-    ## regions may not overlap. Like any procedure dealing with raw
-    ## memory this is **unsafe**.
+proc copyMem*(dest, source: pointer, size: Natural) {.inline, benign,
+  tags: [], raises: [].}
+  ## Copies the contents from the memory at `source` to the memory
+  ## at `dest`.
+  ## Exactly `size` bytes will be copied. The memory
+  ## regions may not overlap. Like any procedure dealing with raw
+  ## memory this is **unsafe**.
 
-  proc moveMem*(dest, source: pointer, size: Natural) {.inline, benign,
-    tags: [], raises: [].}
-    ## Copies the contents from the memory at `source` to the memory
-    ## at `dest`.
-    ##
-    ## Exactly `size` bytes will be copied. The memory
-    ## regions may overlap, `moveMem` handles this case appropriately
-    ## and is thus somewhat more safe than `copyMem`. Like any procedure
-    ## dealing with raw memory this is still **unsafe**, though.
+proc moveMem*(dest, source: pointer, size: Natural) {.inline, benign,
+  tags: [], raises: [].}
+  ## Copies the contents from the memory at `source` to the memory
+  ## at `dest`.
+  ##
+  ## Exactly `size` bytes will be copied. The memory
+  ## regions may overlap, `moveMem` handles this case appropriately
+  ## and is thus somewhat more safe than `copyMem`. Like any procedure
+  ## dealing with raw memory this is still **unsafe**, though.
 
-  proc equalMem*(a, b: pointer, size: Natural): bool {.inline, noSideEffect,
-    tags: [], raises: [].}
-    ## Compares the memory blocks `a` and `b`. `size` bytes will
-    ## be compared.
-    ##
-    ## If the blocks are equal, `true` is returned, `false`
-    ## otherwise. Like any procedure dealing with raw memory this is
-    ## **unsafe**.
+proc equalMem*(a, b: pointer, size: Natural): bool {.inline, noSideEffect,
+  tags: [], raises: [].}
+  ## Compares the memory blocks `a` and `b`. `size` bytes will
+  ## be compared.
+  ##
+  ## If the blocks are equal, `true` is returned, `false`
+  ## otherwise. Like any procedure dealing with raw memory this is
+  ## **unsafe**.
 
-  proc cmpMem*(a, b: pointer, size: Natural): int {.inline, noSideEffect,
-    tags: [], raises: [].}
-    ## Compares the memory blocks `a` and `b`. `size` bytes will
-    ## be compared.
-    ##
-    ## Returns:
-    ## * a value less than zero, if `a < b`
-    ## * a value greater than zero, if `a > b`
-    ## * zero, if `a == b`
-    ##
-    ## Like any procedure dealing with raw memory this is
-    ## **unsafe**.
+proc cmpMem*(a, b: pointer, size: Natural): int {.inline, noSideEffect,
+  tags: [], raises: [].}
+  ## Compares the memory blocks `a` and `b`. `size` bytes will
+  ## be compared.
+  ##
+  ## Returns:
+  ## * a value less than zero, if `a < b`
+  ## * a value greater than zero, if `a > b`
+  ## * zero, if `a == b`
+  ##
+  ## Like any procedure dealing with raw memory this is
+  ## **unsafe**.
 
 when hasAlloc and not defined(js):
 

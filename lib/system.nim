@@ -1619,7 +1619,7 @@ proc instantiationInfo*(index = -1, fullPaths = false): tuple[
 
 when notJSnotNims:
   import system/ansi_c
-  import system/memory
+import system/memory
 
 
 {.push stackTrace: off.}
@@ -2105,23 +2105,22 @@ when not defined(js):
   # the mysterious error message
   {.push stackTrace: off, profiler: off.}
 
-when notJSnotNims:
-  proc zeroMem(p: pointer, size: Natural) =
-    nimZeroMem(p, size)
-    when declared(memTrackerOp):
-      memTrackerOp("zeroMem", p, size)
-  proc copyMem(dest, source: pointer, size: Natural) =
-    nimCopyMem(dest, source, size)
-    when declared(memTrackerOp):
-      memTrackerOp("copyMem", dest, size)
-  proc moveMem(dest, source: pointer, size: Natural) =
-    nimMoveMem(dest, source, size)
-    when declared(memTrackerOp):
-      memTrackerOp("moveMem", dest, size)
-  proc equalMem(a, b: pointer, size: Natural): bool =
-    nimCmpMem(a, b, size) == 0
-  proc cmpMem(a, b: pointer, size: Natural): int =
-    nimCmpMem(a, b, size).int
+proc zeroMem(p: pointer, size: Natural) =
+  nimZeroMem(p, size)
+  when declared(memTrackerOp):
+    memTrackerOp("zeroMem", p, size)
+proc copyMem(dest, source: pointer, size: Natural) =
+  nimCopyMem(dest, source, size)
+  when declared(memTrackerOp):
+    memTrackerOp("copyMem", dest, size)
+proc moveMem(dest, source: pointer, size: Natural) =
+  nimMoveMem(dest, source, size)
+  when declared(memTrackerOp):
+    memTrackerOp("moveMem", dest, size)
+proc equalMem(a, b: pointer, size: Natural): bool =
+  nimCmpMem(a, b, size) == 0
+proc cmpMem(a, b: pointer, size: Natural): int =
+  nimCmpMem(a, b, size).int
 
 when not defined(js) or defined(nimscript):
   # nimscript can be defined if config file for js compilation
