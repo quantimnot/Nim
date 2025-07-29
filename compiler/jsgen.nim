@@ -581,13 +581,13 @@ proc binaryUintExpr(p: PProc, n: PNode, r: var TCompRes, op: string,
   when reassign:
     let (a, tmp) = maybeMakeTempAssignable(p, n[1], x)
     if size == 8 and optJsBigInt64 in p.config.globalOptions:
-      r.res = "$1 = BigInt.asUintN(64, ($4 $2 $3))" % [a, rope op, y.rdLoc, tmp]
+      r.res = "$1 = BigInt.asUintN(64, (BigInt($4) $2 BigInt($3)))" % [a, rope op, y.rdLoc, tmp]
     else:
       let trimmer = unsignedTrimmer(size)
       r.res = "$1 = (($5 $2 $3) $4)" % [a, rope op, y.rdLoc, trimmer, tmp]
   else:
     if size == 8 and optJsBigInt64 in p.config.globalOptions:
-      r.res = "BigInt.asUintN(64, ($1 $2 $3))" % [x.rdLoc, rope op, y.rdLoc]
+      r.res = "BigInt.asUintN(64, (BigInt($1) $2 BigInt($3)))" % [x.rdLoc, rope op, y.rdLoc]
     else:
       let trimmer = unsignedTrimmer(size)
       r.res = "(($1 $2 $3) $4)" % [x.rdLoc, rope op, y.rdLoc, trimmer]
@@ -696,11 +696,11 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
       binaryUintExpr(p, n, r, "+")
     of tyUInt64:
       if optJsBigInt64 in p.config.globalOptions:
-        applyFormat("BigInt.asUintN(64, $1 + BigInt($2))")
+        applyFormat("BigInt.asUintN(64, BigInt($1) + BigInt($2))")
       else: binaryUintExpr(p, n, r, "+")
     elif typ.kind == tyInt64 and optJsBigInt64 in p.config.globalOptions:
       if optOverflowCheck notin p.options:
-        applyFormat("BigInt.asIntN(64, $1 + BigInt($2))")
+        applyFormat("BigInt.asIntN(64, BigInt($1) + BigInt($2))")
       else: binaryExpr(p, n, r, "addInt64", "addInt64($1, BigInt($2))")
     else:
       if optOverflowCheck notin p.options: applyFormat("$1 + $2")
@@ -712,11 +712,11 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
       binaryUintExpr(p, n, r, "-")
     of tyUInt64:
       if optJsBigInt64 in p.config.globalOptions:
-        applyFormat("BigInt.asUintN(64, $1 - BigInt($2))")
+        applyFormat("BigInt.asUintN(64, BigInt($1) - BigInt($2))")
       else: binaryUintExpr(p, n, r, "-")
     elif typ.kind == tyInt64 and optJsBigInt64 in p.config.globalOptions:
       if optOverflowCheck notin p.options:
-        applyFormat("BigInt.asIntN(64, $1 - BigInt($2))")
+        applyFormat("BigInt.asIntN(64, BigInt($1) - BigInt($2))")
       else: binaryExpr(p, n, r, "subInt64", "subInt64($1, BigInt($2))")
     else:
       if optOverflowCheck notin p.options: applyFormat("$1 - $2")
@@ -728,9 +728,9 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
   of mShrI:
     let typ = n[1].typ.skipTypes(abstractVarRange)
     if typ.kind == tyInt64 and optJsBigInt64 in p.config.globalOptions:
-      applyFormat("BigInt.asIntN(64, BigInt.asUintN(64, $1) >> BigInt($2))")
+      applyFormat("BigInt.asIntN(64, BigInt.asUintN(64, BigInt($1)) >> BigInt($2))")
     elif typ.kind == tyUInt64 and optJsBigInt64 in p.config.globalOptions:
-      applyFormat("($1 >> BigInt($2))")
+      applyFormat("(BigInt($1) >> BigInt($2))")
     else:
       if typ.kind in {tyInt..tyInt32}:
         let trimmerU = unsignedTrimmer(typ.size)
@@ -742,9 +742,9 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
     let typ = n[1].typ.skipTypes(abstractVarRange)
     if typ.size == 8:
       if typ.kind == tyInt64 and optJsBigInt64 in p.config.globalOptions:
-        applyFormat("BigInt.asIntN(64, $1 << BigInt($2))")
+        applyFormat("BigInt.asIntN(64, BigInt($1) << BigInt($2))")
       elif typ.kind == tyUInt64 and optJsBigInt64 in p.config.globalOptions:
-        applyFormat("BigInt.asUintN(64, $1 << BigInt($2))")
+        applyFormat("BigInt.asUintN(64, BigInt($1) << BigInt($2))")
       else:
         applyFormat("($1 * Math.pow(2, $2))")
     else:
@@ -814,7 +814,7 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
     let typ = n[1].typ.skipTypes(abstractVarRange)
     if typ.kind in {tyUInt..tyUInt64}:
       if typ.size == 8 and optJsBigInt64 in p.config.globalOptions:
-        applyFormat("BigInt.asUintN(64, ~($1))")
+        applyFormat("BigInt.asUintN(64, ~BigInt($1))")
       else:
         let trimmer = unsignedTrimmer(typ.size)
         r.res = "(~($1) $2)" % [xLoc, trimmer]
@@ -2405,11 +2405,11 @@ proc genMagic(p: PProc, n: PNode, r: var TCompRes) =
       binaryUintExpr(p, n, r, "+", true)
     of tyUInt64:
       if optJsBigInt64 in p.config.globalOptions:
-        binaryExpr(p, n, r, "", "$1 = BigInt.asUintN(64, $3 + BigInt($2))", true)
+        binaryExpr(p, n, r, "", "$1 = BigInt.asUintN(64, BigInt($3) + BigInt($2))", true)
       else: binaryUintExpr(p, n, r, "+", true)
     elif typ.kind == tyInt64 and optJsBigInt64 in p.config.globalOptions:
       if optOverflowCheck notin p.options:
-        binaryExpr(p, n, r, "", "$1 = BigInt.asIntN(64, $3 + BigInt($2))", true)
+        binaryExpr(p, n, r, "", "$1 = BigInt.asIntN(64, BigInt($3) + BigInt($2))", true)
       else: binaryExpr(p, n, r, "addInt64", "$1 = addInt64($3, BigInt($2))", true)
     else:
       if optOverflowCheck notin p.options: binaryExpr(p, n, r, "", "$1 += $2")
@@ -2421,11 +2421,11 @@ proc genMagic(p: PProc, n: PNode, r: var TCompRes) =
       binaryUintExpr(p, n, r, "-", true)
     of tyUInt64:
       if optJsBigInt64 in p.config.globalOptions:
-        binaryExpr(p, n, r, "", "$1 = BigInt.asUintN(64, $3 - BigInt($2))", true)
+        binaryExpr(p, n, r, "", "$1 = BigInt.asUintN(64, BigInt($3) - BigInt($2))", true)
       else: binaryUintExpr(p, n, r, "-", true)
     elif typ.kind == tyInt64 and optJsBigInt64 in p.config.globalOptions:
       if optOverflowCheck notin p.options:
-        binaryExpr(p, n, r, "", "$1 = BigInt.asIntN(64, $3 - BigInt($2))", true)
+        binaryExpr(p, n, r, "", "$1 = BigInt.asIntN(64, BigInt($3) - BigInt($2))", true)
       else: binaryExpr(p, n, r, "subInt64", "$1 = subInt64($3, BigInt($2))", true)
     else:
       if optOverflowCheck notin p.options: binaryExpr(p, n, r, "", "$1 -= $2")
