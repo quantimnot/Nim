@@ -11,8 +11,9 @@ proc nimCopyMem*(dest, source: pointer, size: Natural) {.nonReloadable, compiler
   elif defined(js):
     # JavaScript backend: arrays and indices are passed separately
     {.emit: """
-    if (`size` > 0) {
-      for (var i = 0; i < `size`; i++) {
+    var size_num = Number(`size`);
+    if (size_num > 0) {
+      for (var i = 0; i < size_num; i++) {
         `dest`[`dest`_Idx + i] = `source`[`source`_Idx + i];
       }
     }
@@ -39,15 +40,16 @@ proc nimMoveMem*(dest, source: pointer, size: Natural) {.nonReloadable, compiler
   elif defined(js):
     # JavaScript backend: handle overlapping memory regions
     {.emit: """
-    if (`size` > 0) {
-      if (`dest` === `source` && `dest`_Idx > `source`_Idx && `dest`_Idx < `source`_Idx + `size`) {
+    var size_num = Number(`size`);
+    if (size_num > 0) {
+      if (`dest` === `source` && `dest`_Idx > `source`_Idx && `dest`_Idx < `source`_Idx + size_num) {
         // Overlapping, copy backwards
-        for (var i = `size` - 1; i >= 0; i--) {
+        for (var i = size_num - 1; i >= 0; i--) {
           `dest`[`dest`_Idx + i] = `source`[`source`_Idx + i];
         }
       } else {
         // No overlap or safe to copy forward
-        for (var i = 0; i < `size`; i++) {
+        for (var i = 0; i < size_num; i++) {
           `dest`[`dest`_Idx + i] = `source`[`source`_Idx + i];
         }
       }
