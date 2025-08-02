@@ -1868,3 +1868,111 @@ func getPackage*(sym: NimNode): NimNode =
     while sym.symKind != nskPackage:
       sym = sym.owner
     return sym
+
+func depthFirstSearchAndReplace*(node: NimNode, replacement: NimNode, pattern: NimNode) =
+  ## Performs a depth-first search and replace on the AST.
+  ## Recursively traverses the node tree and replaces all nodes that match
+  ## the pattern with the replacement node.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `pattern`: The pattern to match against (supports literals, identifiers, symbols)
+  ##
+  ## Modifies the AST in-place.
+
+func depthFirstSearchAndReplaceSeq*(node: NimNode, replacement: NimNode, patterns: seq[NimNode]) =
+  ## Performs a depth-first search and replace on the AST.
+  ## Recursively traverses the node tree and replaces all nodes that match
+  ## any of the patterns with the replacement node.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `patterns`: A sequence of patterns to match against (supports literals, identifiers, symbols)
+  ##
+  ## Modifies the AST in-place.
+
+proc depthFirstSearchAndReplace*(node: NimNode, replacement: NimNode, patterns: seq[NimNode]) {.compileTime.} =
+  ## Performs a depth-first search and replace on the AST.
+  ## Recursively traverses the node tree and replaces all nodes that match
+  ## any of the patterns with the replacement node.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `patterns`: A sequence of patterns to match against (supports literals, identifiers, symbols)
+  ##
+  ## Modifies the AST in-place.
+  depthFirstSearchAndReplaceSeq(node, replacement, patterns)
+
+func breadthFirstSearchAndReplace*(node: NimNode, replacement: NimNode, pattern: NimNode) =
+  ## Performs a breadth-first search and replace on the AST.
+  ## Processes nodes level by level, replacing all matching nodes at each level
+  ## before descending to the next level.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `pattern`: The pattern to match against (supports literals, identifiers, symbols)
+  ##
+  ## Modifies the AST in-place.
+
+func breadthFirstSearchAndReplaceSeq*(node: NimNode, replacement: NimNode, patterns: seq[NimNode]) =
+  ## Performs a breadth-first search and replace on the AST.
+  ## Processes nodes level by level, replacing all matching nodes at each level
+  ## before descending to the next level.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `patterns`: A sequence of patterns to match against (supports literals, identifiers, symbols)
+  ##
+  ## Modifies the AST in-place.
+
+proc breadthFirstSearchAndReplace*(node: NimNode, replacement: NimNode, patterns: seq[NimNode]) {.compileTime.} =
+  ## Performs a breadth-first search and replace on the AST.
+  ## Processes nodes level by level, replacing all matching nodes at each level
+  ## before descending to the next level.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `patterns`: A sequence of patterns to match against (supports literals, identifiers, symbols)
+  ##
+  ## Modifies the AST in-place.
+  breadthFirstSearchAndReplaceSeq(node, replacement, patterns)
+
+func depthFirstSearchAndReplaceStructural*(node: NimNode, replacement: NimNode, pattern: NimNode) =
+  ## Performs a depth-first search and replace on the AST using structural matching.
+  ## Structural matching only compares node kinds, not values - so any nkIdent matches any nkIdent.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `pattern`: The pattern to match against (only node kind is compared)
+  ##
+  ## Modifies the AST in-place.
+
+func breadthFirstSearchAndReplaceStructural*(node: NimNode, replacement: NimNode, pattern: NimNode) =
+  ## Performs a breadth-first search and replace on the AST using structural matching.
+  ## Structural matching only compares node kinds, not values - so any nkIdent matches any nkIdent.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `pattern`: The pattern to match against (only node kind is compared)
+  ##
+  ## Modifies the AST in-place.
+
+func depthFirstSearchAndReplaceStructuralSeq*(node: NimNode, replacement: NimNode, patterns: seq[NimNode]) =
+  ## Performs a depth-first search and replace on the AST using structural matching.
+  ## Structural matching only compares node kinds, not values - so any nkIdent matches any nkIdent.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `patterns`: A sequence of patterns to match against (only node kinds are compared)
+  ##
+  ## Modifies the AST in-place.
+
+func breadthFirstSearchAndReplaceStructuralSeq*(node: NimNode, replacement: NimNode, patterns: seq[NimNode]) =
+  ## Performs a breadth-first search and replace on the AST using structural matching.
+  ## Structural matching only compares node kinds, not values - so any nkIdent matches any nkIdent.
+  ##
+  ## - `node`: The root node to process
+  ## - `replacement`: The node to replace matches with
+  ## - `patterns`: A sequence of patterns to match against (only node kinds are compared)
+  ##
+  ## Modifies the AST in-place.

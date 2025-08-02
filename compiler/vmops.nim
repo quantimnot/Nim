@@ -41,6 +41,7 @@ else:
 
 from packages import getPackageSymbol, getModulePackageDir
 from condsyms import definedSymbolNames
+from idents import cmpIgnoreStyle
 
 # There are some useful procs in vmconv.
 import vmconv, vmmarshal, vmdebugapi
@@ -450,46 +451,215 @@ proc registerAdditionalOps*(c: PCtx) =
   # VM Debugging API builtins
   registerCallback c, "stdlib.vmdebug.vmDumpContext", proc(a: VmArgs) =
     vmDebugDumpContext(c)
-    
+
   registerCallback c, "stdlib.vmdebug.vmDumpNode", proc(a: VmArgs) =
     let node = getNode(a, 0)
     let depth = getInt(a, 1)
     vmDebugDumpNode(node, depth.int)
-    
+
   registerCallback c, "stdlib.vmdebug.vmTraceUncheckedArray", proc(a: VmArgs) =
     let address = getInt(a, 0)
     let operation = getString(a, 1)
     vmDebugTraceUncheckedArray(address, operation)
-    
+
   registerCallback c, "stdlib.vmdebug.vmNodeToYaml", proc(a: VmArgs) =
     let node = getNode(a, 0)
     let yamlRepr = nodeToYamlRepr(cast[pointer](node))
     setResult(a, yamlRepr)
-    
+
   registerCallback c, "stdlib.vmdebug.vmNodeKind", proc(a: VmArgs) =
     let node = getNode(a, 0)
     let kindName = getNodeKindName(cast[pointer](node))
     setResult(a, kindName)
-    
+
   registerCallback c, "stdlib.vmdebug.vmNodeType", proc(a: VmArgs) =
     let node = getNode(a, 0)
     let typeName = getNodeTypeName(cast[pointer](node))
     setResult(a, typeName)
-    
+
   registerCallback c, "stdlib.vmdebug.vmTraceAssignment", proc(a: VmArgs) =
     let regKind = getString(a, 0)
     let nodeKind = getString(a, 1)
     let description = getString(a, 2)
     vmDebugTraceAssignment(regKind, nodeKind, description)
-    
+
   registerCallback c, "stdlib.vmdebug.vmTraceRefCounting", proc(a: VmArgs) =
     let nodeAddr = getInt(a, 0)
     let nodeKind = getString(a, 1)
     let operation = getString(a, 2)
     vmDebugTraceRefCounting(nodeAddr, nodeKind, operation)
-    
+
   registerCallback c, "stdlib.vmdebug.vmTraceWriteField", proc(a: VmArgs) =
     let fieldName = getString(a, 0)
     let srcKind = getString(a, 1)
     let destKind = getString(a, 2)
     vmDebugTraceWriteField(fieldName, srcKind, destKind)
+
+  block searchAndReplaceVmops:
+    type
+      TraversalKind = enum
+        tkDepthFirst, tkBreadthFirst
+      MatchKind = enum
+        mkValue, mkStructural
+
+    proc nodeMatchesValue(node: PNode, pat: PNode): bool =
+      # Value-based pattern matching for AST nodes
+      case pat.kind
+      of nkIdent:
+        # Match by identifier name (case-insensitive, ignoring underscores)
+        result = node.kind == nkIdent and cmpIgnoreStyle(node.ident.s, pat.ident.s, pat.ident.s.len) == 0
+      of nkSym:
+        # Match by symbol name (case-insensitive, ignoring underscores)
+        result = node.kind == nkSym and cmpIgnoreStyle(node.sym.name.s, pat.sym.name.s, pat.sym.name.s.len) == 0
+      of nkIntLit..nkUInt64Lit:
+        # Match integer literals by value
+        result = node.kind in nkIntLit..nkUInt64Lit and node.intVal == pat.intVal
+      of nkFloatLit..nkFloat128Lit:
+        # Match float literals by value
+        result = node.kind in nkFloatLit..nkFloat128Lit and node.floatVal == pat.floatVal
+      of nkStrLit..nkTripleStrLit:
+        # Match string literals by value
+        result = node.kind in nkStrLit..nkTripleStrLit and node.strVal == pat.strVal
+      else:
+        # For other node types, match by exact equality
+        result = node.kind == pat.kind
+
+    proc nodeMatchesStructural(node: PNode, pat: PNode): bool =
+      # Structural matching - only compare node kinds
+      result = node.kind == pat.kind
+
+    proc nodeMatchesValueSeq(node: PNode, patterns: PNode): bool =
+      # Check if node matches any pattern in the sequence (value-based)
+      if patterns.kind != nkBracket:
+        return false
+      for i in 0..<patterns.len:
+        if nodeMatchesValue(node, patterns[i]):
+          return true
+      return false
+
+    proc nodeMatchesStructuralSeq(node: PNode, patterns: PNode): bool =
+      # Check if node structurally matches any pattern in the sequence
+      if patterns.kind != nkBracket:
+        return false
+      for i in 0..<patterns.len:
+        if nodeMatchesStructural(node, patterns[i]):
+          return true
+      return false
+
+    proc searchAndReplaceSingle(targetNode: PNode, replacement: PNode, pattern: PNode,
+                                traversal: TraversalKind, matchKind: MatchKind) =
+      # Generic search and replace for single pattern
+      let nodeMatches = if matchKind == mkValue: nodeMatchesValue else: nodeMatchesStructural
+      proc replaceInNode(node: PNode) =
+        case node.kind
+        of nkIdent, nkSym, nkIntLit..nkUInt64Lit, nkFloatLit..nkFloat128Lit,
+          nkStrLit..nkTripleStrLit, nkCharLit, nkNilLit, nkEmpty:
+          discard  # Leaf nodes don't have children
+        else:
+          if node.len > 0:
+            if traversal == tkDepthFirst:
+              # DFS: process children first, then replace
+              for i in 0..<node.len:
+                if nodeMatches(node[i], pattern):
+                  node[i] = replacement.copyTree()
+                else:
+                  replaceInNode(node[i])
+            else:
+              # BFS: replace at current level first, then recurse
+              for i in 0..<node.len:
+                if nodeMatches(node[i], pattern):
+                  node[i] = replacement.copyTree()
+              for i in 0..<node.len:
+                if not nodeMatches(node[i], pattern):
+                  replaceInNode(node[i])
+      if nodeMatches(targetNode, pattern):
+        discard "Cannot replace root node in-place"
+      else:
+        replaceInNode(targetNode)
+
+    proc searchAndReplaceSeq(targetNode: PNode, replacement: PNode, patterns: PNode,
+                            traversal: TraversalKind, matchKind: MatchKind) =
+      # Generic search and replace for pattern sequences
+      let nodeMatches = if matchKind == mkValue: nodeMatchesValueSeq else: nodeMatchesStructuralSeq
+      proc replaceInNode(node: PNode) =
+        case node.kind
+        of nkIdent, nkSym, nkIntLit..nkUInt64Lit, nkFloatLit..nkFloat128Lit,
+          nkStrLit..nkTripleStrLit, nkCharLit, nkNilLit, nkEmpty:
+          discard  # Leaf nodes don't have children
+        else:
+          if node.len > 0:
+            if traversal == tkDepthFirst:
+              # DFS: process children first, then replace
+              for i in 0..<node.len:
+                if nodeMatches(node[i], patterns):
+                  node[i] = replacement.copyTree()
+                else:
+                  replaceInNode(node[i])
+            else:
+              # BFS: replace at current level first, then recurse
+              for i in 0..<node.len:
+                if nodeMatches(node[i], patterns):
+                  node[i] = replacement.copyTree()
+              for i in 0..<node.len:
+                if not nodeMatches(node[i], patterns):
+                  replaceInNode(node[i])
+      if nodeMatches(targetNode, patterns):
+        discard "Cannot replace root node in-place"
+      else:
+        replaceInNode(targetNode)
+
+    registerCallback c, "stdlib.macros.depthFirstSearchAndReplace", proc(a: VmArgs) =
+      # Parameters: node (NimNode), replacement (NimNode), pattern (NimNode)
+      let targetNode = getNode(a, 0)
+      let replacement = getNode(a, 1)
+      let pattern = getNode(a, 2)
+      searchAndReplaceSingle(targetNode, replacement, pattern, tkDepthFirst, mkValue)
+
+    registerCallback c, "stdlib.macros.breadthFirstSearchAndReplace", proc(a: VmArgs) =
+      # Parameters: node (NimNode), replacement (NimNode), pattern (NimNode)
+      let targetNode = getNode(a, 0)
+      let replacement = getNode(a, 1)
+      let pattern = getNode(a, 2)
+      searchAndReplaceSingle(targetNode, replacement, pattern, tkBreadthFirst, mkValue)
+
+    registerCallback c, "stdlib.macros.breadthFirstSearchAndReplaceSeq", proc(a: VmArgs) =
+      # Parameters: node (NimNode), replacement (NimNode), patterns (seq[NimNode])
+      let targetNode = getNode(a, 0)
+      let replacement = getNode(a, 1)
+      let patternsNode = getNode(a, 2)
+      searchAndReplaceSeq(targetNode, replacement, patternsNode, tkBreadthFirst, mkValue)
+
+    registerCallback c, "stdlib.macros.depthFirstSearchAndReplaceSeq", proc(a: VmArgs) =
+      # Parameters: node (NimNode), replacement (NimNode), patterns (seq[NimNode])
+      let targetNode = getNode(a, 0)
+      let replacement = getNode(a, 1)
+      let patternsNode = getNode(a, 2)
+      searchAndReplaceSeq(targetNode, replacement, patternsNode, tkDepthFirst, mkValue)
+
+    registerCallback c, "stdlib.macros.depthFirstSearchAndReplaceStructural", proc(a: VmArgs) =
+      # Parameters: node (NimNode), replacement (NimNode), pattern (NimNode)
+      let targetNode = getNode(a, 0)
+      let replacement = getNode(a, 1)
+      let pattern = getNode(a, 2)
+      searchAndReplaceSingle(targetNode, replacement, pattern, tkDepthFirst, mkStructural)
+
+    registerCallback c, "stdlib.macros.breadthFirstSearchAndReplaceStructural", proc(a: VmArgs) =
+      # Parameters: node (NimNode), replacement (NimNode), pattern (NimNode)
+      let targetNode = getNode(a, 0)
+      let replacement = getNode(a, 1)
+      let pattern = getNode(a, 2)
+      searchAndReplaceSingle(targetNode, replacement, pattern, tkBreadthFirst, mkStructural)
+
+    registerCallback c, "stdlib.macros.depthFirstSearchAndReplaceStructuralSeq", proc(a: VmArgs) =
+      # Parameters: node (NimNode), replacement (NimNode), patterns (seq[NimNode])
+      let targetNode = getNode(a, 0)
+      let replacement = getNode(a, 1)
+      let patternsNode = getNode(a, 2)
+      searchAndReplaceSeq(targetNode, replacement, patternsNode, tkDepthFirst, mkStructural)
+
+    registerCallback c, "stdlib.macros.breadthFirstSearchAndReplaceStructuralSeq", proc(a: VmArgs) =
+      # Parameters: node (NimNode), replacement (NimNode), patterns (seq[NimNode])
+      let targetNode = getNode(a, 0)
+      let replacement = getNode(a, 1)
+      let patternsNode = getNode(a, 2)
+      searchAndReplaceSeq(targetNode, replacement, patternsNode, tkBreadthFirst, mkStructural)
