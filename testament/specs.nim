@@ -57,6 +57,8 @@ type
     reSuccess          # test was successful
     reInvalidSpec      # test had problems to parse the spec
     reRetry            # test is being retried
+    reKnownIssue       # test failed due to a known issue (soft failure)
+    reFixedKnownIssue  # test with a known issue unexpectedly passed
 
   TTarget* = enum
     targetC = "c"
@@ -77,6 +79,8 @@ type
     action*: TTestAction
     file*, cmd*: string
     filename*: string ## Test filename (without path).
+    description*: string ## Test description/summary.
+    knownIssue*: string ## URL to known issue tracker (e.g. GitHub issue). Makes failures soft failures.
     input*: string
     outputCheck*: TOutputCheck
     sortoutput*: bool
@@ -347,6 +351,10 @@ proc parseSpec*(filename: string): TSpec =
           result.action = actionReject
         else:
           result.parseErrors.addLine "cannot interpret as action: ", e.value
+      of "description":
+        result.description = e.value
+      of "knownissue":
+        result.knownIssue = e.value
       of "file":
         if result.msg.len == 0 and result.nimout.len == 0:
           result.parseErrors.addLine "errormsg or msg needs to be specified before file"

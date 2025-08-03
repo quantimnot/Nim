@@ -24,6 +24,8 @@ proc generateTestResultPanelPartial(outfile: File, testResultRow: JsonNode) =
     result = htmlQuote testResultRow["result"].str
     expected = testResultRow["expected"].getStr
     gotten = testResultRow["given"].getStr
+    knownIssue = testResultRow["knownIssue"].getStr
+    description = testResultRow["description"].getStr
     timestamp = "unknown"
   var
     panelCtxClass, textCtxClass, bgCtxClass: string
@@ -41,6 +43,18 @@ proc generateTestResultPanelPartial(outfile: File, testResultRow: JsonNode) =
     bgCtxClass = "info"
     resultSign = "question"
     resultDescription = if result != "reJoined": "SKIP" else: "JOINED"
+  of "reKnownIssue":
+    panelCtxClass = "warning"
+    textCtxClass = "warning"
+    bgCtxClass = "warning"
+    resultSign = "warning"
+    resultDescription = "KNOWN ISSUE"
+  of "reFixedKnownIssue":
+    panelCtxClass = "warning"
+    textCtxClass = "warning"
+    bgCtxClass = "warning"
+    resultSign = "star"
+    resultDescription = "FIXED ISSUE"
   else:
     panelCtxClass = "danger"
     textCtxClass = "danger"
@@ -50,7 +64,7 @@ proc generateTestResultPanelPartial(outfile: File, testResultRow: JsonNode) =
 
   outfile.generateHtmlTestresultPanelBegin(
     trId, name, target, category, action, resultDescription,
-    timestamp, result, resultSign, panelCtxClass, textCtxClass, bgCtxClass
+    timestamp, result, resultSign, panelCtxClass, textCtxClass, bgCtxClass, knownIssue, description
   )
   if expected.isEmptyOrWhitespace() and gotten.isEmptyOrWhitespace():
     outfile.generateHtmlTestresultOutputNone()
@@ -64,8 +78,8 @@ proc generateTestResultPanelPartial(outfile: File, testResultRow: JsonNode) =
 type
   AllTests = object
     data: JsonNode
-    totalCount, successCount, ignoredCount, failedCount: int
-    successPercentage, ignoredPercentage, failedPercentage: BiggestFloat
+    totalCount, successCount, ignoredCount, failedCount, knownIssueCount: int
+    successPercentage, ignoredPercentage, failedPercentage, knownIssuePercentage: BiggestFloat
 
 proc allTestResults(onlyFailing = false): AllTests =
   result = AllTests(data: newJArray())
@@ -80,14 +94,18 @@ proc allTestResults(onlyFailing = false): AllTests =
         if state.contains("reSuccess"): inc result.successCount
         elif state.contains("reDisabled") or state.contains("reJoined"):
           inc result.ignoredCount
+        elif state.contains("reKnownIssue") or state.contains("reFixedKnownIssue"):
+          inc result.knownIssueCount
         if not onlyFailing or not(state.contains("reSuccess")):
           result.data.add elem
   result.successPercentage = 100 *
     (result.successCount.toBiggestFloat / result.totalCount.toBiggestFloat)
   result.ignoredPercentage = 100 *
     (result.ignoredCount.toBiggestFloat / result.totalCount.toBiggestFloat)
+  result.knownIssuePercentage = 100 *
+    (result.knownIssueCount.toBiggestFloat / result.totalCount.toBiggestFloat)
   result.failedCount = result.totalCount -
-    result.successCount - result.ignoredCount
+    result.successCount - result.ignoredCount - result.knownIssueCount
   result.failedPercentage = 100 *
     (result.failedCount.toBiggestFloat / result.totalCount.toBiggestFloat)
 
@@ -113,6 +131,8 @@ proc generateAllTestsContent(outfile: File, allResults: AllTests,
     formatBiggestFloat(allResults.successPercentage, ffDecimal, 2) & "%",
     allResults.ignoredCount,
     formatBiggestFloat(allResults.ignoredPercentage, ffDecimal, 2) & "%",
+    allResults.knownIssueCount,
+    formatBiggestFloat(allResults.knownIssuePercentage, ffDecimal, 2) & "%",
     allResults.failedCount,
     formatBiggestFloat(allResults.failedPercentage, ffDecimal, 2) & "%",
     onlyFailing

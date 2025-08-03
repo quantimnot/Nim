@@ -107,6 +107,13 @@ Example "template" **to edit** and write a Testament unittest:
 
   ```nim
   discard """
+    # Optional description of what this test is testing.
+    description: "Test basic arithmetic operations"
+
+    # Optional URL to a known issue tracker (e.g., GitHub issue). When specified,
+    # test failures become "soft failures" that are reported but don't cause the 
+    # test run to fail. Known issues that unexpectedly pass are also highlighted.
+    knownIssue: "https://github.com/nim-lang/Nim/issues/12345"
 
     # What actions to expect completion on.
     # Options:

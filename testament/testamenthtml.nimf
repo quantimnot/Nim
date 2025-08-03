@@ -141,6 +141,7 @@
 #  totalCount: BiggestInt,
 #  successCount: BiggestInt, successPercentage: string,
 #  ignoredCount: BiggestInt, ignoredPercentage: string,
+#  knownIssueCount: BiggestInt, knownIssuePercentage: string,
 #  failedCount: BiggestInt, failedPercentage: string, onlyFailing = false) =
         <dl class="dl-horizontal">
             <dt>Hostname</dt>
@@ -165,6 +166,11 @@
             <dd>
                 <span class="glyphicon glyphicon-question-sign"></span>
                 %ignoredCount (%ignoredPercentage)
+            </dd>
+            <dt>Known Issues</dt>
+            <dd>
+                <span class="glyphicon glyphicon-warning-sign"></span>
+                %knownIssueCount (%knownIssuePercentage)
             </dd>
             <dt>Failed Tests</dt>
             <dd>
@@ -210,6 +216,17 @@
                     </td>
                 </tr>
                 <tr>
+                    <th class="text-right" style="vertical-align:middle">Known Issues</th>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-default" type="button" onclick="showAll('warning');">Show All</button>
+                            <button class="btn btn-default" type="button" onclick="hideAll('warning');">Hide All</button>
+                            <button class="btn btn-default" type="button" onclick="expandAll('warning');">Expand All</button>
+                            <button class="btn btn-default" type="button" onclick="collapseAll('warning');">Collapse All</button>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
                     <th class="text-right" style="vertical-align:middle">Failed Tests</th>
                     <td>
                         <div class="btn-group">
@@ -226,7 +243,7 @@
 #end proc
 #proc generateHtmlTestresultPanelBegin*(outfile: File, trId, name, target, category,
 #  action, resultDescription, timestamp, result, resultSign,
-#  panelCtxClass, textCtxClass, bgCtxClass: string) =
+#  panelCtxClass, textCtxClass, bgCtxClass, knownIssue, description: string) =
             <div id="panel-testResult-%trId" class="panel panel-%panelCtxClass">
                 <div class="panel-heading" style="cursor:pointer" data-toggle="collapse" data-target="#panel-body-testResult-%trId" aria-controls="panel-body-testResult-%trId" aria-expanded="false">
                     <div class="row">
@@ -243,6 +260,10 @@
                     <dl class="dl-horizontal">
                         <dt>Name</dt>
                         <dd><code class="text-%textCtxClass">%name</code></dd>
+#if description.len > 0:
+                        <dt>Description</dt>
+                        <dd>%description</dd>
+#end if
                         <dt>Category</dt>
                         <dd><span class="badge">%category</span></dd>
                         <dt>Timestamp</dt>
@@ -253,6 +274,10 @@
                         <dd><span class="badge">%target</span></dd>
                         <dt>Code</dt>
                         <dd><code class="text-%textCtxClass">%result</code></dd>
+#if knownIssue.len > 0:
+                        <dt>Known Issue</dt>
+                        <dd><a href="%knownIssue" target="_blank" class="text-%textCtxClass">%knownIssue</a></dd>
+#end if
                     </dl>
 #end proc
 #proc generateHtmlTestresultOutputDetails*(outfile: File, expected, gotten: string) =
