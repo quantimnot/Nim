@@ -658,7 +658,14 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
       else:
         applyFormat("addInt($1, $2)")
     else:
-      applyFormat("($1 + $2)")
+      let typ = n[1].typ.skipTypes(abstractVarRange)
+      case typ.kind
+      of tyInt8:
+        applyFormat("(($1 + $2) << 24 >> 24)")  # Sign-extend from bit 7
+      of tyInt16:
+        applyFormat("(($1 + $2) << 16 >> 16)")  # Sign-extend from bit 15
+      else:
+        applyFormat("($1 + $2)")
   of mSubI:
     if i == 0:
       if n[1].typ.size == 8 and optJsBigInt64 in p.config.globalOptions:
@@ -667,7 +674,14 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
       else:
         applyFormat("subInt($1, $2)")
     else:
-      applyFormat("($1 - $2)")
+      let typ = n[1].typ.skipTypes(abstractVarRange)
+      case typ.kind
+      of tyInt8:
+        applyFormat("(($1 - $2) << 24 >> 24)")  # Sign-extend from bit 7
+      of tyInt16:
+        applyFormat("(($1 - $2) << 16 >> 16)")  # Sign-extend from bit 15
+      else:
+        applyFormat("($1 - $2)")
   of mMulI:
     if i == 0:
       if n[1].typ.size == 8 and optJsBigInt64 in p.config.globalOptions:
@@ -676,7 +690,14 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
       else:
         applyFormat("mulInt($1, $2)")
     else:
-      applyFormat("($1 * $2)")
+      let typ = n[1].typ.skipTypes(abstractVarRange)
+      case typ.kind
+      of tyInt8:
+        applyFormat("(($1 * $2) << 24 >> 24)")  # Sign-extend from bit 7
+      of tyInt16:
+        applyFormat("(($1 * $2) << 16 >> 16)")  # Sign-extend from bit 15
+      else:
+        applyFormat("($1 * $2)")
   of mDivI:
     if n[1].typ.size == 8 and optJsBigInt64 in p.config.globalOptions:
       useMagic(p, "divInt64")
@@ -703,7 +724,14 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
         applyFormat("BigInt.asIntN(64, BigInt($1) + BigInt($2))")
       else: binaryExpr(p, n, r, "addInt64", "addInt64($1, BigInt($2))")
     else:
-      if optOverflowCheck notin p.options: applyFormat("$1 + $2")
+      if optOverflowCheck notin p.options:
+        case typ.kind
+        of tyInt8:
+          applyFormat("(($1 + $2) << 24 >> 24)")  # Sign-extend from bit 7
+        of tyInt16:
+          applyFormat("(($1 + $2) << 16 >> 16)")  # Sign-extend from bit 15
+        else:
+          applyFormat("$1 + $2")  # tyInt, tyInt32, tyInt64 without BigInt
       else: binaryExpr(p, n, r, "addInt", "addInt($1, $2)")
   of mPred:
     let typ = n[1].typ.skipTypes(abstractVarRange)
@@ -719,7 +747,14 @@ proc arithAux(p: PProc, n: PNode, r: var TCompRes, op: TMagic) =
         applyFormat("BigInt.asIntN(64, BigInt($1) - BigInt($2))")
       else: binaryExpr(p, n, r, "subInt64", "subInt64($1, BigInt($2))")
     else:
-      if optOverflowCheck notin p.options: applyFormat("$1 - $2")
+      if optOverflowCheck notin p.options:
+        case typ.kind
+        of tyInt8:
+          applyFormat("(($1 - $2) << 24 >> 24)")  # Sign-extend from bit 7
+        of tyInt16:
+          applyFormat("(($1 - $2) << 16 >> 16)")  # Sign-extend from bit 15
+        else:
+          applyFormat("$1 - $2")  # tyInt, tyInt32, tyInt64 without BigInt
       else: binaryExpr(p, n, r, "subInt", "subInt($1, $2)")
   of mAddF64: applyFormat("($1 + $2)", "($1 + $2)")
   of mSubF64: applyFormat("($1 - $2)", "($1 - $2)")
@@ -2658,8 +2693,13 @@ proc genRangeChck(p: PProc, n: PNode, r: var TCompRes, magic: string) =
       r.res = "Number($1)" % [r.res]
   else:
     if src.kind in {tyInt64, tyUInt64} and dest.kind notin {tyInt64, tyUInt64} and optJsBigInt64 in p.config.globalOptions:
-      # we do a range check anyway, so it's ok if the number gets rounded
-      r.res = "Number($1)" % [r.res]
+      # For BigInt to smaller int conversions, we need to truncate first before range checking
+      if dest.kind in {tyInt..tyInt32}:
+        let bits = if dest.size > 0: dest.size * 8 else: 32
+        r.res = "Number(BigInt.asIntN($1, $2))" % [$bits, r.res]
+      elif dest.kind in {tyUInt..tyUInt32}:
+        let bits = if dest.size > 0: dest.size * 8 else: 32
+        r.res = "Number(BigInt.asUintN($1, $2))" % [$bits, r.res]
     gen(p, n[1], a)
     gen(p, n[2], b)
     useMagic(p, "chckRange")
