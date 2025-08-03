@@ -44,6 +44,8 @@ const
 # XXX Still incorrect, see tests/arc/tdestroy_in_loopcond
 
 proc nimIncRefCyclic(p: pointer; cyclic: bool) {.compilerRtl, inl.} =
+  when defined(nimArcDebug):
+    checkMemoryValidity(p, "nimIncRefCyclic")
   let h = head(p)
   inc h.rc, rcIncrement
   when optimizedOrc:
@@ -513,6 +515,8 @@ proc rememberCycle(isDestroyAction: bool; s: Cell; desc: PNimTypeV2) {.noinline.
 proc nimDecRefIsLastCyclicDyn(p: pointer): bool {.compilerRtl, inl.} =
   result = false
   if p != nil:
+    when defined(nimArcDebug):
+      checkMemoryValidity(p, "nimDecRefIsLastCyclicDyn")
     var cell = head(p)
     if (cell.rc and not rcMask) == 0:
       result = true
@@ -525,6 +529,8 @@ proc nimDecRefIsLastCyclicDyn(p: pointer): bool {.compilerRtl, inl.} =
 proc nimDecRefIsLastDyn(p: pointer): bool {.compilerRtl, inl.} =
   result = false
   if p != nil:
+    when defined(nimArcDebug):
+      checkMemoryValidity(p, "nimDecRefIsLastDyn")
     var cell = head(p)
     if (cell.rc and not rcMask) == 0:
       result = true
@@ -539,6 +545,8 @@ proc nimDecRefIsLastDyn(p: pointer): bool {.compilerRtl, inl.} =
 proc nimDecRefIsLastCyclicStatic(p: pointer; desc: PNimTypeV2): bool {.compilerRtl, inl.} =
   result = false
   if p != nil:
+    when defined(nimArcDebug):
+      checkMemoryValidity(p, "nimDecRefIsLastCyclicStatic")
     var cell = head(p)
     if (cell.rc and not rcMask) == 0:
       result = true
