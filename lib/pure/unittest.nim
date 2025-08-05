@@ -531,7 +531,7 @@ template suite*(name, body) {.dirty.} =
   ##     [Suite] test suite for addition
   ##       [OK] 2 + 2 = 4
   ##       [OK] (2 + -2) != 4
-  bind formatters, ensureInitialized, suiteEnded
+  bind formatters, ensureInitialized, suiteEnded, suiteStarted
 
   block:
     template setup(setupBody: untyped) {.dirty, used.} =
@@ -574,7 +574,7 @@ template test*(name, body) {.dirty.} =
   ## The above code outputs:
   ##
   ##     [OK] roses are red
-  bind shouldRun, checkpoints, formatters, ensureInitialized, testEnded, exceptionTypeName, setProgramResult
+  bind shouldRun, checkpoints, formatters, ensureInitialized, testStarted, testEnded, exceptionTypeName, setProgramResult, TestStatus
 
   ensureInitialized()
 
