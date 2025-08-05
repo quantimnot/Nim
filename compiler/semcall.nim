@@ -464,7 +464,7 @@ const
   errUndeclaredField = "undeclared field: '$1'"
   errUndeclaredRoutine = "attempting to call undeclared routine: '$1'"
   errBadRoutine = "attempting to call routine: '$1'$2"
-  errAmbiguousCallXYZ = "ambiguous call; both $1 and $2 match for: $3"
+  errAmbiguousCallXYZ = "ambiguous call; both\n    $1\n      and\n    $2\n      match for:\n    $3"
 
 proc describeParamList(c: PContext, n: PNode, startIdx = 1; prefer = preferName): string =
   result = "Expression: " & $n
