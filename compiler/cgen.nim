@@ -608,6 +608,12 @@ proc initLocalVar(p: BProc, v: PSym, immediateAsgn: bool) =
     # Nowadays the logic in ccgcalls deals with this case however.
     if not immediateAsgn:
       constructLoc(p, v.loc)
+  elif containsGarbageCollectedRef(v.loc.t):
+    # Even with {.noinit.}, ref types must be initialized to nil to prevent
+    # memory corruption in ref counting operations. An uninitialized ref
+    # pointer containing garbage will crash when passed to nimDecRef.
+    if not immediateAsgn:
+      linefmt(p, cpsStmts, "$1 = NIM_NIL;$n", [rdLoc(v.loc)])
 
 proc getTemp(p: BProc, t: PType, needsInit=false): TLoc =
   inc(p.labels)
