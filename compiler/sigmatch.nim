@@ -2753,11 +2753,14 @@ proc prepareOperand(c: PContext; formal: PType; a: PNode, newlyTyped: var bool):
     else:
       # XXX This is unsound! 'formal' can differ from overloaded routine to
       # overloaded routine!
-      let flags = {efDetermineType, efAllowStmt}
+      var flags = {efDetermineType, efAllowStmt}
                   #if formal.kind == tyIterable: {efDetermineType, efWantIterator}
                   #else: {efDetermineType, efAllowStmt}
                   #elif formal.kind == tyTyped: {efDetermineType, efWantStmt}
                   #else: {efDetermineType}
+      # For template arguments, add a special flag to help with type/module disambiguation
+      if formal.kind in {tyTypeDesc, tyUntyped}:
+        flags.incl efInTemplateArg
       result = c.semOperand(c, a, flags)
     newlyTyped = true
   else:

@@ -3259,13 +3259,35 @@ proc resolveIdentToSym(c: PContext, n: PNode, resultNode: var PNode,
     filter.excl {skModule, skPackage}
   let includePureEnum = expectedType != nil and
     expectedType.skipTypes(abstractRange-{tyDistinct}).kind == tyEnum
-  let candidates = lookUpCandidates(c, ident, filter,
+  var candidates = lookUpCandidates(c, ident, filter,
     includePureEnum = includePureEnum)
+
+  # Special handling for module/type ambiguity in template contexts
+  # This handles both constrained templates (via efInTemplateArg) and unconstrained templates (via template expansion detection)
+  if (efInTemplateArg in flags or c.templInstCounter[] > 0) and
+     candidates.len == 1 and candidates[0].kind == skModule and skType in filter:
+    # Continue searching imports for type symbols
+    searchImportsAll(c, ident, filter, candidates)
   if candidates.len == 0:
     result = errorUndeclaredIdentifierHint(c, ident, n.info)
   elif candidates.len == 1 or {efNoEvaluateGeneric, efInCall} * flags != {}:
     # unambiguous, or we don't care about ambiguity
-    result = candidates[0]
+    # However, if we're in template argument context and have both module and type,
+    # prefer the type symbol
+    if efInTemplateArg in flags and candidates.len > 1:
+      var typeCandidate: PSym = nil
+      var hasModule = false
+      for cand in candidates:
+        if cand.kind == skType:
+          typeCandidate = cand
+        elif cand.kind in {skModule, skPackage}:
+          hasModule = true
+      if typeCandidate != nil and hasModule:
+        result = typeCandidate
+      else:
+        result = candidates[0]
+    else:
+      result = candidates[0]
   else:
     # ambiguous symbols have 1 last chance as a symchoice
     var choice = newNodeIT(nkClosedSymChoice, n.info, newTypeS(tyNone, c))
